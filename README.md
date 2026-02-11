@@ -16,7 +16,12 @@ Dewey is a Claude Code plugin that helps you intelligently manage, analyze, and 
 
 # Install the dewey plugin
 /plugin install dewey
+
+# Run the setup script to install Python dependencies
+cd ~/.claude/plugins/dewey && ./setup.sh
 ```
+
+**Note**: The setup script installs the Python package that powers the analysis features. You only need to run this once after installation.
 
 ### Use Commands
 

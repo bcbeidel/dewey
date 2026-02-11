@@ -8,18 +8,38 @@ Dewey is a Claude Code plugin that helps you intelligently manage, analyze, and 
 
 ## Quick Start
 
-### Load the Plugin
+### Install the Plugin
 
 ```bash
-cd /path/to/context-system
-claude --plugin-dir ./dewey
+# Add the dewey marketplace
+/plugin marketplace add bcbeidel/dewey
+
+# Install the dewey plugin
+/plugin install dewey
 ```
 
 ### Use Commands
 
+Once installed, you can use dewey commands in your Claude Code sessions:
+
 ```
 /dewey:analyze .
 /dewey:split large-file.md
+```
+
+### Development Setup
+
+For local development:
+
+```bash
+# Clone the repository
+git clone https://github.com/bcbeidel/dewey.git
+cd dewey
+
+# Create symlink to plugins directory
+ln -s "$(pwd)/dewey" ~/.claude/plugins/dewey
+
+# Restart Claude Code
 ```
 
 ## Documentation

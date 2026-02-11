@@ -137,10 +137,10 @@ When invoked, I (Claude) will analyze the file content and provide a refactoring
 {
   "folder_name": "semantic-theme-name",
   "main_content": "Refactored main.md with overview and navigation",
-  "reference_sections": [
+  "detail_files": [
     {
       "name": "descriptive-kebab-case-name",
-      "content": "Full content for this reference file"
+      "content": "Full content for this detail file"
     }
   ],
   "summary": "Brief description of organizational strategy",
@@ -149,11 +149,12 @@ When invoked, I (Claude) will analyze the file content and provide a refactoring
 ```
 
 **Important:**
-- `folder_name`: Must be semantic (based on content theme), not the old filename
-- Example: "cooking" not "recipes", "project-phases" not "IMPLEMENTATION_PLAN"
+- `folder_name`: Must describe the CONTENT THEME (e.g., "software-development", "cooking-techniques")
+- DO NOT use generic terms like "references", "docs", "files", or "content" in folder_name
 - Use lowercase with hyphens (kebab-case)
+- Example: "cooking" not "recipes", "project-phases" not "IMPLEMENTATION_PLAN"
 - Main content will be saved as `main.md` in the folder
-- Reference sections are supporting files in the same folder
+- Detail files are topical supporting files in the same folder
 
 After providing the plan, I will use `implement_refactor_plan()` to write the files unless `--dry-run` is specified.
 

@@ -32,7 +32,7 @@ class RefactorPlan:
 
     folder_name: str  # Semantic name for the folder (e.g., "cooking", "project-phases")
     main_content: str
-    reference_sections: list[dict[str, str]]  # [{name: str, content: str}]
+    detail_files: list[dict[str, str]]  # [{name: str, content: str}]
     summary: str
     reasoning: str
 
@@ -84,82 +84,56 @@ def generate_refactor_prompt(request: AnalysisRequest) -> str:
 {request.content}
 ```
 
-**Task**: Analyze this content and refactor it into a CLEAN, hierarchical folder structure.
+**Task**: Analyze this content and refactor it into a semantic folder structure:
 
-**CRITICAL NAMING RULES:**
-1. **Folder name** - Simple, clean, semantic:
-   - Think hierarchically: broad concept → specific topic
-   - NO timestamps (no "2026-02", no dates)
-   - NO synthesis/collection suffixes (no "synthesis", "collection")
-   - Use the CORE CONCEPT only
-   - Examples: "best-practices" (not "best-practices-synthesis-2026-02")
-   - Examples: "cooking" (not "recipes-collection"), "api" (not "api-reference-v2")
+1. **Determine semantic folder name** (based on content theme):
+   - Analyze the overarching theme of the content
+   - Choose a name that reflects the CONTENT, not the old filename
+   - Use lowercase-with-hyphens (kebab-case)
+   - DO NOT include path separators (/) or prefixes like "references/"
+   - This should be a SINGLE folder name only (e.g., "cooking", "project-phases")
+   - Examples: "cooking" (not "recipes" or "references/recipes"), "project-phases" (not "IMPLEMENTATION_PLAN" or "references/IMPLEMENTATION_PLAN")
 
-2. **File names** - Clean topic names:
-   - NO numbered prefixes (no "theme-1-", "section-2-", "part-3-")
-   - NO redundant context (folder already provides it)
-   - Just the topic name: "progressive-disclosure.md" (not "theme-1-progressive-disclosure.md")
-   - Examples: "italian-pasta.md", "french-desserts.md", "quality-testing.md"
+2. **Main file** (~{request.target_main_lines} lines) - Will be saved as `main.md`:
+   - Essential overview/introduction
+   - Key high-level concepts
+   - Clear navigation to detailed sections
+   - Scannable structure
 
-3. **Hierarchical thinking**:
-   - The filepath should tell a story from broad → narrow
-   - Example: skills/best-practices/progressive-disclosure.md
-   - Reads as: "Skills area → Best practices topic → Specific practice"
+3. **Detail files** (1-3 topically organized) - Will be saved alongside main.md:
+   - Group related content together
+   - Self-contained sections
+   - Descriptive names (e.g., "italian-pasta", "french-desserts", "phase-1-tasks")
+   - Link back to main file
 
-**Structure to create:**
-
-Main file (~{request.target_main_lines} lines) as `main.md`:
-- Essential overview
-- Navigation to supporting files
-- Scannable structure
-
-Supporting files (3-10 topically organized):
-- One clear topic per file
-- Clean, descriptive names (no prefixes)
-- Self-contained content
-- Link back to main
-
-**Quality checks**:
-- ✅ Folder name is simple and semantic (no dates, no suffixes)
-- ✅ File names are clean topics (no "theme-1-", no "part-2-")
-- ✅ Filepath reads as a logical hierarchy
-- ✅ All information preserved
-- ✅ Clear navigation with bidirectional links
+**Best Practices**:
+- Folder name must be semantic and theme-based
+- Maintain semantic coherence (don't break mid-section)
+- Preserve ALL information (no content loss)
+- Create clear navigation (bidirectional links)
+- Use descriptive headers
+- Group by topic/theme, not arbitrary lines
 
 **Output Format** (JSON):
 ```json
 {{
-  "folder_name": "core-concept",
+  "folder_name": "semantic-theme-name",
   "main_content": "the refactored main.md content with overview and navigation",
-  "reference_sections": [
+  "detail_files": [
     {{
-      "name": "topic-name",
-      "content": "full content for this supporting file"
-    }},
-    {{
-      "name": "another-topic",
-      "content": "full content for this supporting file"
+      "name": "descriptive-kebab-case-name",
+      "content": "full content for this detail file"
     }}
   ],
   "summary": "brief description of organizational strategy",
-  "reasoning": "explanation of folder naming and content organization"
+  "reasoning": "explanation of why content was grouped this way and folder naming choice"
 }}
 ```
 
-**Example for a best practices document:**
-```json
-{{
-  "folder_name": "best-practices",
-  "main_content": "...",
-  "reference_sections": [
-    {{"name": "progressive-disclosure", "content": "..."}},
-    {{"name": "description-discovery", "content": "..."}},
-    {{"name": "tool-definition", "content": "..."}}
-  ],
-  "summary": "Organized into core practices",
-  "reasoning": "Folder 'best-practices' is the core concept. Files are clean topic names without prefixes."
-}}
-```
+**IMPORTANT**:
+- `folder_name` must describe the CONTENT THEME (e.g., "software-development", "cooking-techniques")
+- DO NOT use generic terms like "references", "docs", "files", or "content" in folder_name
+- DO NOT include path separators (/) in folder_name
 
 Please provide ONLY the JSON output, no additional commentary."""
 
@@ -192,7 +166,7 @@ def parse_llm_response(response: str) -> RefactorPlan:
         return RefactorPlan(
             folder_name=data["folder_name"],
             main_content=data["main_content"],
-            reference_sections=data["reference_sections"],
+            detail_files=data["detail_files"],
             summary=data["summary"],
             reasoning=data["reasoning"],
         )
@@ -292,28 +266,28 @@ def implement_refactor_plan(
     with open(main_file, "w", encoding="utf-8") as f:
         f.write(plan.main_content)
 
-    # Write supporting files in the same folder
-    reference_files = []
-    for ref in plan.reference_sections:
-        ref_file = semantic_dir / f"{ref['name']}.md"
-        with open(ref_file, "w", encoding="utf-8") as f:
-            f.write(ref["content"])
-        reference_files.append(ref_file)
+    # Write detail files in the same folder
+    detail_file_paths = []
+    for detail in plan.detail_files:
+        detail_file = semantic_dir / f"{detail['name']}.md"
+        with open(detail_file, "w", encoding="utf-8") as f:
+            f.write(detail["content"])
+        detail_file_paths.append(detail_file)
 
     # Remove original file (it's already backed up)
     file_path.unlink()
 
     # Calculate line counts
     main_lines = len(plan.main_content.split("\n"))
-    ref_lines = sum(len(ref["content"].split("\n")) for ref in plan.reference_sections)
+    detail_lines = sum(len(detail["content"].split("\n")) for detail in plan.detail_files)
 
     result = SplitResult(
         original_file=file_path,
         main_file=main_file,
-        reference_files=reference_files,
+        reference_files=detail_file_paths,
         backup_file=backup_path,
         lines_in_main=main_lines,
-        lines_in_references=ref_lines,
+        lines_in_references=detail_lines,
         total_lines=total_lines,
         wikilinks_updated=0,
     )

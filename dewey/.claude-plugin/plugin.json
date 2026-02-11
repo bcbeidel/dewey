@@ -6,10 +6,7 @@
     "name": "Dewey Contributors"
   },
   "homepage": "https://github.com/bcbeidel/dewey",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bcbeidel/dewey.git"
-  },
+  "repository": "https://github.com/bcbeidel/dewey.git",
   "keywords": [
     "context",
     "optimization",

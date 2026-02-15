@@ -11,6 +11,7 @@ from scaffold import (
     _parse_agents_topics,
     _read_topic_metadata,
     merge_managed_section,
+    rebuild_index,
     scaffold_kb,
 )
 from templates import MARKER_BEGIN, MARKER_END
@@ -595,6 +596,62 @@ class TestReadTopicMetadata(unittest.TestCase):
         result = _read_topic_metadata(path)
         self.assertEqual(result["name"], "")
         self.assertEqual(result["depth"], "working")
+
+
+class TestScaffoldIndexIncludesTopics(unittest.TestCase):
+    """scaffold_kb regenerates index.md with discovered topics."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_index_md_includes_topics_on_reinit(self):
+        """After adding topic files, re-scaffold picks them up in index.md."""
+        scaffold_kb(self.tmpdir, "Dev", domain_areas=["Testing"])
+        # Manually create a topic file (simulating curate workflow)
+        topic = self.tmpdir / "docs" / "testing" / "unit-testing.md"
+        topic.write_text("---\nsources:\n  - url: https://example.com\n    title: Ex\nlast_validated: 2026-01-15\nrelevance: core\ndepth: working\n---\n# Unit Testing\n")
+        # Re-scaffold
+        scaffold_kb(self.tmpdir, "Dev", domain_areas=["Testing"])
+        index = (self.tmpdir / "docs" / "index.md").read_text()
+        self.assertIn("Unit Testing", index)
+        self.assertIn("unit-testing.md", index)
+
+    def test_index_md_has_no_frontmatter(self):
+        scaffold_kb(self.tmpdir, "Dev", domain_areas=["Testing"])
+        index = (self.tmpdir / "docs" / "index.md").read_text()
+        self.assertFalse(index.startswith("---"))
+
+
+class TestRebuildIndex(unittest.TestCase):
+    """Tests for the rebuild_index standalone function."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+        scaffold_kb(self.tmpdir, "Dev", domain_areas=["Testing"])
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_rebuild_index_updates_from_disk(self):
+        # Add a topic file
+        topic = self.tmpdir / "docs" / "testing" / "api.md"
+        topic.write_text("---\nsources:\n  - url: https://example.com\n    title: Ex\nlast_validated: 2026-01-15\nrelevance: core\ndepth: working\n---\n# API Patterns\n")
+        rebuild_index(self.tmpdir)
+        index = (self.tmpdir / "docs" / "index.md").read_text()
+        self.assertIn("API Patterns", index)
+
+    def test_rebuild_index_reads_role_from_agents_md(self):
+        rebuild_index(self.tmpdir)
+        index = (self.tmpdir / "docs" / "index.md").read_text()
+        self.assertIn("Dev", index)
+
+    def test_rebuild_index_respects_knowledge_dir_config(self):
+        result = rebuild_index(self.tmpdir)
+        self.assertEqual(result, "docs/index.md")
+        self.assertTrue((self.tmpdir / "docs" / "index.md").exists())
 
 
 if __name__ == "__main__":

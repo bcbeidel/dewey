@@ -11,7 +11,7 @@ import re
 import sys
 from pathlib import Path
 
-from config import write_config
+from config import read_knowledge_dir, write_config
 from templates import (
     MARKER_BEGIN,
     MARKER_END,
@@ -344,15 +344,7 @@ def scaffold_kb(
         created.append("CLAUDE.md (merged)")
 
     # ------------------------------------------------------------------
-    # 5. index.md inside the knowledge directory
-    # ------------------------------------------------------------------
-    index_path = knowledge_path / "index.md"
-    index_existed = index_path.exists()
-    index_path.write_text(render_index_md(role_name, area_slugs))
-    created.append(f"{knowledge_dir}/index.md" + (" (updated)" if index_existed else ""))
-
-    # ------------------------------------------------------------------
-    # 6. Domain area directories + overview.md
+    # 5. Domain area directories + overview.md
     # ------------------------------------------------------------------
     for name in domain_areas:
         slug = _slugify(name)
@@ -365,6 +357,18 @@ def scaffold_kb(
                 render_overview_md(name, relevance="core", topics=[])
             )
             created.append(f"{knowledge_dir}/{slug}/overview.md")
+
+    # ------------------------------------------------------------------
+    # 6. index.md inside the knowledge directory (filesystem-driven)
+    # ------------------------------------------------------------------
+    index_path = knowledge_path / "index.md"
+    index_existed = index_path.exists()
+    index_data = _discover_index_data(target_dir, knowledge_dir)
+    # Fall back to area_slugs if no files on disk yet (fresh scaffold)
+    if not index_data:
+        index_data = area_slugs
+    index_path.write_text(render_index_md(role_name, index_data))
+    created.append(f"{knowledge_dir}/index.md" + (" (updated)" if index_existed else ""))
 
     # ------------------------------------------------------------------
     # 7. Curation plan (.dewey/curation-plan.md)
@@ -415,12 +419,44 @@ def scaffold_kb(
     return "\n".join(summary_lines)
 
 
+def rebuild_index(target_dir: Path) -> str:
+    """Regenerate index.md from the current filesystem contents.
+
+    Parameters
+    ----------
+    target_dir:
+        Root directory containing the knowledge base.
+
+    Returns
+    -------
+    str
+        Path to the written index.md relative to target_dir.
+    """
+    knowledge_dir_name = read_knowledge_dir(target_dir)
+    knowledge_path = target_dir / knowledge_dir_name
+
+    # Read role name from AGENTS.md heading
+    agents_path = target_dir / "AGENTS.md"
+    role_name = "Knowledge Base"
+    if agents_path.exists():
+        heading_match = re.search(
+            r"^# Role:\s*(.+)$", agents_path.read_text(), re.MULTILINE
+        )
+        if heading_match:
+            role_name = heading_match.group(1).strip()
+
+    index_data = _discover_index_data(target_dir, knowledge_dir_name)
+    index_path = knowledge_path / "index.md"
+    index_path.write_text(render_index_md(role_name, index_data))
+    return f"{knowledge_dir_name}/index.md"
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Scaffold a knowledge base.")
     parser.add_argument("--target", required=True, help="Target directory")
-    parser.add_argument("--role", required=True, help="Role name")
+    parser.add_argument("--role", default="", help="Role name")
     parser.add_argument(
         "--areas",
         default="",
@@ -436,13 +472,22 @@ if __name__ == "__main__":
         default="docs",
         help="Name of the knowledge directory (default: docs)",
     )
+    parser.add_argument(
+        "--rebuild-index",
+        action="store_true",
+        help="Regenerate index.md from filesystem contents and exit.",
+    )
     args = parser.parse_args()
 
-    areas = (
-        [a.strip() for a in args.areas.split(",") if a.strip()]
-        if args.areas
-        else []
-    )
-    topics = json.loads(args.starter_topics) if args.starter_topics else None
-    result = scaffold_kb(Path(args.target), args.role, areas, topics, knowledge_dir=args.knowledge_dir)
-    print(result)
+    if args.rebuild_index:
+        result = rebuild_index(Path(args.target))
+        print(f"Rebuilt {result}")
+    else:
+        areas = (
+            [a.strip() for a in args.areas.split(",") if a.strip()]
+            if args.areas
+            else []
+        )
+        topics = json.loads(args.starter_topics) if args.starter_topics else None
+        result = scaffold_kb(Path(args.target), args.role, areas, topics, knowledge_dir=args.knowledge_dir)
+        print(result)

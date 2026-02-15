@@ -144,6 +144,15 @@ Returns `{"tier1": {...}, "tier2": {...}}` with both Tier 1 issues/summary and T
 - `trigger_concrete_examples` -- Flags working files with missing or abstract "In Practice"
 
 Every trigger returns: `{"file": str, "trigger": str, "reason": str, "context": dict}`
+
+**history.py** -- Health score history tracking
+- `record_snapshot(kb_root, tier1_summary, tier2_summary)` -- Appends timestamped snapshot to `.dewey/history/health-log.jsonl`
+- `read_history(kb_root, limit=10)` -- Returns the last N snapshots in chronological order
+- Auto-called by `check_kb.py` after each run
+
+**utilization.py** -- Topic reference tracking
+- `record_reference(kb_root, file_path, context="user")` -- Appends to `.dewey/utilization/log.jsonl`
+- `read_utilization(kb_root)` -- Returns per-file stats: `{file: {count, first_referenced, last_referenced}}`
 </scripts_integration>
 
 <success_criteria>

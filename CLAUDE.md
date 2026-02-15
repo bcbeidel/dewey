@@ -147,5 +147,5 @@ All validators and triggers return structured dicts:
 | Tier 2 pre-screener (5 triggers) | Complete |
 | Tier 2 LLM-assisted audit workflow | Complete |
 | Tier 3 human decision queue | Designed, not yet tested |
-| Utilization tracking | Infrastructure scaffolded |
-| History / baselines | Infrastructure scaffolded |
+| Utilization tracking | Complete |
+| History / baselines | Complete |

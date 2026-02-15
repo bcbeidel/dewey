@@ -1,116 +1,177 @@
-# Context System - Dewey Plugin Development
+# Dewey -- Knowledge Base Management for Claude Code
 
-This repository contains **Dewey**, a context optimization plugin for Claude Code.
+Dewey is a Claude Code plugin that helps you build, curate, and maintain structured knowledge bases. It implements a [specification](docs/plans/2026-02-14-knowledge-base-spec-design.md) for role-specific knowledge bases that serve both AI agents and humans.
 
-## What is Dewey?
+## Why
 
-Dewey is a Claude Code plugin that helps you intelligently manage, analyze, and optimize your context files using LLM-based analysis. It uses your existing Claude Code session - no additional API keys or costs required.
+AI agents produce better outputs when they have access to curated, relevant knowledge. But knowledge bases serve two consumers: the **agent** (who needs structured, token-efficient context) and the **human** (who needs readable, navigable content). Dewey defines a standard for what a well-formed knowledge base looks like and provides skills to create and maintain one.
 
-**Key Features:**
-- ✅ **Zero dependencies** - Uses only Python built-in libraries
-- ✅ **No installation required** - Works immediately after plugin install
-- ✅ **No API costs** - Uses your existing Claude Code session
-- ✅ **Portable** - Works anywhere Python 3.9+ exists
+The spec is provider-agnostic -- the output works with any agent (Claude Code, Codex, Gemini CLI, Cursor, etc.).
 
-## Quick Start
+## Skills
 
-### Install the Plugin
+| Skill | Purpose |
+|-------|---------|
+| `/dewey:init` | Bootstrap a new knowledge base with directory structure, AGENTS.md, and templates |
+| `/dewey:curate` | Add topics, propose additions, promote proposals, ingest from URLs |
+| `/dewey:health` | Validate quality, check freshness, analyze coverage gaps, generate reports |
+| `/dewey:explore` | Discover what knowledge domains to capture through guided conversation |
 
-```bash
-# Add the dewey marketplace
-/plugin marketplace add bcbeidel/dewey
+### `/dewey:init`
 
-# Install the dewey plugin
-/plugin install dewey
+Scaffolds a new knowledge base. Provide a role name and optionally domain areas:
+
+```
+/dewey:init --role "Platform Engineer" --areas "Infrastructure,Observability,CI/CD"
 ```
 
-That's it! No additional setup needed.
+Creates: AGENTS.md (persona + manifest), CLAUDE.md (agent instructions), docs/ directory with overview files per area, and the `.dewey/` metadata directories.
 
-### Use Commands
+### `/dewey:curate`
 
-Once installed, you can use dewey commands in your Claude Code sessions:
+Manages the content lifecycle:
 
-```bash
-# Analyze your context directory (defaults to ./context/)
-/dewey:analyze
+- **add** -- Research a topic, draft working-knowledge and reference files, update all indexes
+- **propose** -- Submit a topic proposal for review before committing
+- **promote** -- Move a validated proposal into a domain area
+- **ingest** -- Ingest an external URL, evaluate against existing KB, then propose new content or update existing topics
 
-# Analyze a specific directory
-/dewey:analyze path/to/directory
-
-# Split a large file using LLM semantic analysis
-/dewey:split large-file.md
+```
+/dewey:curate add Project Structure in python-foundations
+/dewey:curate propose "Dependency Injection" --rationale "Coverage gap"
+/dewey:curate promote dependency-injection --target-area python-foundations
 ```
 
-### Development Setup
+### `/dewey:health`
 
-For local development:
+Validates knowledge base quality with deterministic checks (Tier 1):
+
+- Frontmatter completeness (sources, last_validated, relevance, depth)
+- Section ordering for working-knowledge files
+- Cross-reference integrity
+- Size bounds per depth level
+- Coverage gaps (missing overviews, missing reference companions)
+- Freshness (staleness by last_validated date)
+- Source URL format validation
+
+```
+/dewey:health check
+/dewey:health freshness
+/dewey:health coverage
+```
+
+### `/dewey:explore`
+
+Guided discovery conversation to identify what knowledge domains matter for a role, before committing to structure.
+
+## Knowledge Base Structure
+
+A Dewey-conformant knowledge base looks like:
+
+```
+project-root/
+  AGENTS.md                          # Role persona + topic manifest
+  CLAUDE.md                          # Agent instructions + domain area index
+  docs/
+    <domain-area>/
+      overview.md                    # Area orientation (depth: overview)
+      <topic>.md                     # Working knowledge (depth: working)
+      <topic>.ref.md                 # Expert reference (depth: reference)
+    _proposals/                      # Staged additions pending review
+  .dewey/
+    health/                          # Quality scores
+    history/                         # Change log
+    utilization/                     # Reference tracking
+```
+
+Every knowledge file carries YAML frontmatter: `sources`, `last_validated`, `relevance`, and `depth`.
+
+## Design Principles
+
+Twelve principles grounded in agent context research (Anthropic, OpenAI) and cognitive science (Sweller, Vygotsky, Paivio, Bjork, Pirolli, Kalyuga, Dunlosky).
+
+### From Agent Context Research
+
+1. **Source Primacy** -- The knowledge base is a curated guide, not a replacement for primary sources. Every entry points to one. When an agent or human needs to go deeper, the path is always clear.
+2. **Dual Audience** -- Every entry serves the agent (structured, token-efficient context) and the human (readable, navigable content). When these conflict, favor human readability -- agents are more adaptable readers.
+3. **Three-Dimensional Quality** -- Content quality measured across relevance, accuracy/freshness, and structural fitness simultaneously.
+4. **Collaborative Curation** -- Either the human or an agent can propose additions, but all content passes through validation. The human brings domain judgment. The agent brings systematic coverage. Neither is sufficient alone.
+5. **Provenance & Traceability** -- Every piece of knowledge carries metadata about where it came from, when it was last validated, and why it's in the KB.
+6. **Domain-Shaped Organization** -- Organized around the domain's natural structure, not file types or technical categories. The taxonomy should feel intuitive to a practitioner.
+7. **Right-Sized Scope** -- Contains what's needed to be effective in the role, and no more. The curation act is as much about what you exclude as what you include.
+8. **Empirical Feedback** -- Observable signals about KB health: coverage gaps, stale entries, unused content. Proxy metrics inform curation decisions.
+9. **Progressive Disclosure** -- Layered access so agents can discover what's available without loading everything. Metadata -> summaries -> full content -> deep references.
+
+### From Cognitive Science Research
+
+10. **Explain the Why** -- Causal explanations produce better comprehension and retention than stating facts alone. Every entry explains not just what to do, but why.
+11. **Concrete Before Abstract** -- Lead with examples and worked scenarios, then build toward the abstraction. Concrete concepts create stronger memory traces.
+12. **Multiple Representations** -- Important concepts should exist at multiple levels of depth (overview, working knowledge, reference). Material that helps novices can hinder experts and vice versa -- label each level clearly so readers self-select.
+
+See the full [specification](docs/plans/2026-02-14-knowledge-base-spec-design.md) for detailed rationale and research sources.
+
+## Tech Stack
+
+- Python 3.9+ (stdlib only -- zero dependencies)
+- Markdown with YAML frontmatter
+- Claude Code skills framework
+
+## Development
 
 ```bash
-# Clone the repository
 git clone https://github.com/bcbeidel/dewey.git
 cd dewey
 
-# Create symlink to plugins directory
+# Symlink the plugin for local development
 ln -s "$(pwd)/dewey" ~/.claude/plugins/dewey
 
-# Restart Claude Code
+# Run tests
+python3 -m pytest tests/ -v
 ```
 
-## Documentation
-
-- **[Plugin README](dewey/README.md)** - Complete plugin documentation
-- **[Implementation Plan](IMPLEMENTATION_PLAN.md)** - Development roadmap
-
-## Plugin Structure
+## Project Structure
 
 ```
 dewey/
-├── .claude-plugin/plugin.json    # Plugin manifest
-├── skills/                        # Claude Code skills
-│   ├── analyze/                   # Context analysis skill
-│   │   ├── SKILL.md               # Skill definition
-│   │   └── scripts/               # Python helpers
-│   └── split/                     # File splitting skill
-│       ├── SKILL.md               # Skill definition
-│       └── scripts/               # Python helpers
-├── scripts/                       # Standalone CLI tools
-├── tests/                         # Test suite
-└── README.md                      # Plugin documentation
+  .claude-plugin/plugin.json         # Plugin manifest
+  skills/
+    init/                             # KB bootstrapping
+      SKILL.md
+      scripts/scaffold.py, templates.py
+      workflows/init.md
+      references/kb-spec-summary.md
+    curate/                           # Content lifecycle
+      SKILL.md
+      scripts/create_topic.py, propose.py, promote.py
+      workflows/curate-add.md, curate-propose.md, curate-promote.md, curate-ingest.md
+    health/                           # Quality validation
+      SKILL.md
+      scripts/validators.py, check_kb.py
+      workflows/health-check.md, health-audit.md, health-review.md, health-coverage.md, health-freshness.md
+      references/validation-rules.md, quality-dimensions.md
+    explore/                          # Domain discovery
+      SKILL.md
+      workflows/explore-discovery.md
+docs/plans/                           # Design documents
+tests/                                # Test suite (185 tests)
 ```
-
-## Features
-
-**Version**: 0.0.5
-
-### `/dewey:analyze` - Context Analysis
-- Analyzes your context directory (defaults to `./context/`)
-- Identifies token usage, large files, and optimization opportunities
-- Provides prioritized recommendations with token impact estimates
-- Suggests specific actions like splitting files or removing duplicates
-
-### `/dewey:split` - Intelligent File Splitting
-- Uses LLM semantic analysis (not mechanical splitting)
-- Maintains semantic coherence across split boundaries
-- Creates scannable main file + topical reference files
-- Follows Anthropic's context organization best practices
-- Backs up original files automatically
 
 ## Status
 
-- ✅ Zero dependencies - Uses only Python built-in libraries
-- ✅ Skills-based structure following Claude Code best practices
-- ✅ LLM-driven semantic analysis for intelligent optimization
-- ✅ Context-aware defaults (analyzes `./context/` by default)
-- 📋 Additional optimization features planned
+**v1.0.0** -- Core skills implemented and tested.
 
-See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for details.
+| Feature | Status |
+|---------|--------|
+| KB scaffolding (`/dewey:init`) | Complete |
+| Content lifecycle (`/dewey:curate add/propose/promote`) | Complete |
+| URL ingestion (`/dewey:curate ingest`) | Complete |
+| Tier 1 deterministic health checks | Complete (7 validators) |
+| Tier 2 LLM-assisted health assessments | Designed, not yet implemented |
+| Domain discovery (`/dewey:explore`) | Complete |
+| Utilization tracking | Infrastructure scaffolded |
+| History / baselines | Infrastructure scaffolded |
 
-## Project Files
+## Documentation
 
-- `dewey/` - Plugin implementation
-- `IMPLEMENTATION_PLAN.md` - Development roadmap v2.0
-- `README.md` - This file
-
----
-
-**For full plugin documentation, see [dewey/README.md](dewey/README.md)**
+- [Knowledge Base Specification](docs/plans/2026-02-14-knowledge-base-spec-design.md) -- The full design spec
+- [Implementation Plan](docs/plans/2026-02-14-kb-skills-implementation.md) -- How the skills were built (completed)

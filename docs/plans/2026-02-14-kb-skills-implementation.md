@@ -1,6 +1,6 @@
 # Knowledge Base Skills Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **Status: COMPLETED** -- All 12 tasks implemented and tested (185 passing tests). See the summary below for what was built. A fourth skill (`/dewey:explore`) was added after this plan was executed.
 
 **Goal:** Build three Dewey skills (`/dewey:init`, `/dewey:curate`, `/dewey:health`) that implement the knowledge base specification defined in `docs/plans/2026-02-14-knowledge-base-spec-design.md`.
 
@@ -9,6 +9,16 @@
 **Tech Stack:** Python 3.9+ (stdlib only), Markdown, YAML frontmatter, Claude Code skills framework
 
 **Design Doc:** `docs/plans/2026-02-14-knowledge-base-spec-design.md`
+
+## Completion Notes
+
+All tasks were completed in order. Notable changes from the original plan during implementation:
+
+- **Init workflows consolidated**: `init-empty.md` and `init-from-role.md` were merged into a single `init.md` workflow
+- **Skills directory moved**: `skills/` relocated to `dewey/skills/` to live alongside the plugin manifest
+- **CLAUDE.md generation added**: `scaffold.py` and `templates.py` were extended to generate CLAUDE.md with domain area tables and dewey-managed markers
+- **Curate-add Step 5 hardened**: Explicit format examples added for AGENTS.md table rows, overview.md Key Sources, and CLAUDE.md verification after observing the agent improvise incorrect formats
+- **`/dewey:explore` added post-plan**: A fourth skill for guided domain discovery was built outside this plan
 
 ---
 

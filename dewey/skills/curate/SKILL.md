@@ -35,7 +35,7 @@ Managing content in a knowledge base.
 - `add` -- Create a new topic in a domain area from the template
 - `propose` -- Submit a topic proposal for review
 - `promote` -- Move a validated proposal into a domain area
-- `ingest` -- Create a proposal from an external URL (stub)
+- `ingest` -- Ingest an external URL, evaluate against existing KB, then propose or update
 
 Parse the action from `$ARGUMENTS`. If no arguments provided, present the options and ask the user which action to take.
 </intake>
@@ -62,7 +62,7 @@ All workflows in `workflows/`:
 | curate-add.md | Create a new topic in a domain area from template |
 | curate-propose.md | Submit a topic proposal for review |
 | curate-promote.md | Promote a validated proposal into a domain area |
-| curate-ingest.md | Create a proposal from an external URL (stub) |
+| curate-ingest.md | Ingest an external URL into a pre-filled proposal |
 </workflows_index>
 
 <scripts_integration>

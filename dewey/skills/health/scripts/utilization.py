@@ -57,3 +57,39 @@ def record_reference(
         fh.write(json.dumps(entry) + "\n")
 
     return log_path
+
+
+def read_utilization(kb_root: Path) -> dict[str, dict]:
+    """Read utilization stats per file.
+
+    Returns mapping of file path to
+    {"count": int, "first_referenced": str, "last_referenced": str}.
+    """
+    log_file = kb_root / ".dewey" / "utilization" / "log.jsonl"
+    if not log_file.exists():
+        return {}
+
+    lines = log_file.read_text().strip().split("\n")
+    if not lines or lines == [""]:
+        return {}
+
+    stats: dict[str, dict] = {}
+    for line in lines:
+        entry = json.loads(line)
+        fp = entry["file"]
+        ts = entry["timestamp"]
+
+        if fp not in stats:
+            stats[fp] = {
+                "count": 0,
+                "first_referenced": ts,
+                "last_referenced": ts,
+            }
+
+        stats[fp]["count"] += 1
+        if ts < stats[fp]["first_referenced"]:
+            stats[fp]["first_referenced"] = ts
+        if ts > stats[fp]["last_referenced"]:
+            stats[fp]["last_referenced"] = ts
+
+    return stats

@@ -19,6 +19,13 @@ if _init_scripts not in sys.path:
     sys.path.insert(0, _init_scripts)
 
 from config import read_knowledge_dir
+from tier2_triggers import (
+    trigger_concrete_examples,
+    trigger_depth_accuracy,
+    trigger_source_drift,
+    trigger_source_primacy,
+    trigger_why_quality,
+)
 from validators import (
     check_coverage,
     check_cross_references,
@@ -103,6 +110,53 @@ def run_health_check(kb_root: Path) -> dict:
     }
 
 
+_TIER2_TRIGGERS = [
+    trigger_source_drift,
+    trigger_depth_accuracy,
+    trigger_source_primacy,
+    trigger_why_quality,
+    trigger_concrete_examples,
+]
+
+
+def run_tier2_prescreening(kb_root: Path) -> dict:
+    """Run all Tier 2 deterministic triggers and return a structured queue.
+
+    Parameters
+    ----------
+    kb_root:
+        Root directory containing the ``docs/`` folder.
+
+    Returns
+    -------
+    dict
+        ``{"queue": [...], "summary": {...}}``
+    """
+    knowledge_dir_name = read_knowledge_dir(kb_root)
+    md_files = _discover_md_files(kb_root, knowledge_dir_name)
+
+    queue: list[dict] = []
+    trigger_counts: dict[str, int] = {}
+
+    for md_file in md_files:
+        for trigger_fn in _TIER2_TRIGGERS:
+            for item in trigger_fn(md_file):
+                queue.append(item)
+                t = item["trigger"]
+                trigger_counts[t] = trigger_counts.get(t, 0) + 1
+
+    files_with_triggers = len({item["file"] for item in queue})
+
+    return {
+        "queue": queue,
+        "summary": {
+            "total_files_scanned": len(md_files),
+            "files_with_triggers": files_with_triggers,
+            "trigger_counts": trigger_counts,
+        },
+    }
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -112,7 +166,16 @@ if __name__ == "__main__":
         required=True,
         help="Root directory containing the docs/ folder.",
     )
+    parser.add_argument(
+        "--tier2",
+        action="store_true",
+        help="Run Tier 2 pre-screening instead of Tier 1 checks.",
+    )
     args = parser.parse_args()
 
-    report = run_health_check(Path(args.kb_root))
+    kb_path = Path(args.kb_root)
+    if args.tier2:
+        report = run_tier2_prescreening(kb_path)
+    else:
+        report = run_health_check(kb_path)
     print(json.dumps(report, indent=2))

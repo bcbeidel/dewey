@@ -6,7 +6,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from check_kb import run_health_check
+from check_kb import run_health_check, run_tier2_prescreening
 
 
 def _write(path: Path, text: str) -> Path:
@@ -138,6 +138,75 @@ class TestRunHealthCheck(unittest.TestCase):
         _write(area / "topic.md", _valid_md("working"))
         result = run_health_check(self.tmpdir)
         self.assertEqual(result["summary"]["total_files"], 2)
+
+
+class TestRunTier2Prescreening(unittest.TestCase):
+    """Tests for the run_tier2_prescreening function."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+        self.kb = self.tmpdir / "docs"
+        self.kb.mkdir()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_returns_structured_queue(self):
+        """Result has 'queue' and 'summary' keys."""
+        area = self.kb / "area-one"
+        area.mkdir()
+        _write(area / "overview.md", _valid_md("overview"))
+        result = run_tier2_prescreening(self.tmpdir)
+        self.assertIn("queue", result)
+        self.assertIn("summary", result)
+        self.assertIsInstance(result["queue"], list)
+        self.assertIsInstance(result["summary"], dict)
+
+    def test_stale_file_produces_trigger(self):
+        """A file with old last_validated should produce a source_drift trigger."""
+        area = self.kb / "area-one"
+        area.mkdir()
+        stale_md = (
+            "---\n"
+            "sources:\n"
+            "  - https://example.com/doc\n"
+            "last_validated: 2020-01-01\n"
+            "relevance: core\n"
+            "depth: overview\n"
+            "---\n"
+            "\n"
+            "# Topic\n"
+            "\n"
+            "Content here.\n"
+        )
+        _write(area / "stale.md", stale_md)
+        result = run_tier2_prescreening(self.tmpdir)
+        drift_items = [i for i in result["queue"] if i["trigger"] == "source_drift"]
+        self.assertTrue(len(drift_items) > 0)
+
+    def test_summary_includes_counts(self):
+        """Summary contains total_files_scanned, files_with_triggers, trigger_counts."""
+        area = self.kb / "area-one"
+        area.mkdir()
+        _write(area / "overview.md", _valid_md("overview"))
+        result = run_tier2_prescreening(self.tmpdir)
+        summary = result["summary"]
+        for key in ("total_files_scanned", "files_with_triggers", "trigger_counts"):
+            self.assertIn(key, summary, f"Missing summary key: {key}")
+
+    def test_clean_file_no_triggers(self):
+        """A well-formed file should produce no triggers."""
+        area = self.kb / "area-one"
+        area.mkdir()
+        # Pad with enough words to satisfy Tier 2 depth_accuracy (min 50 for overview)
+        extra = "\n".join([f"Additional content line {i} with words." for i in range(10)])
+        _write(area / "overview.md", _valid_md("overview", extra_body=extra))
+        result = run_tier2_prescreening(self.tmpdir)
+        overview_triggers = [
+            i for i in result["queue"]
+            if "overview.md" in i["file"]
+        ]
+        self.assertEqual(overview_triggers, [])
 
 
 if __name__ == "__main__":

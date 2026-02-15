@@ -135,29 +135,51 @@ def render_agents_md(role_name: str, domain_areas: list[dict], *, knowledge_dir:
 def render_index_md(role_name: str, domain_areas: list[dict]) -> str:
     """Render docs/index.md (human-readable TOC).
 
+    No frontmatter — index.md is structural, not a knowledge topic.
+
     Parameters
     ----------
     role_name:
         Included for context in the preamble.
     domain_areas:
         List of ``{"name": "Area Name", "dirname": "area-name"}``.
+        Each area can optionally include ``"topics"`` — a list of
+        ``{"name": ..., "filename": ..., "depth": ...}`` dicts.
+        When topics are present, they appear in a table under the area.
+        When absent, only the overview link is shown.
     """
     sections: list[str] = []
 
     sections.append("# Knowledge Base")
     sections.append("")
     sections.append(f"> Domain knowledge for **{role_name}**.")
-    sections.append("")
-    sections.append("## Domain Areas")
-    sections.append("")
 
-    if domain_areas:
-        sections.append("| Area | Overview |")
-        sections.append("|------|----------|")
-        for area in domain_areas:
-            sections.append(f"| {area['name']} | [{area['dirname']}/overview.md]({area['dirname']}/overview.md) |")
-    else:
+    if not domain_areas:
+        sections.append("")
         sections.append("<!-- No domain areas yet. Use init --role to create them. -->")
+        return "\n".join(sections) + "\n"
+
+    for area in domain_areas:
+        sections.append("")
+        sections.append(f"## {area['name']}")
+        sections.append("")
+
+        topics = area.get("topics", [])
+        if topics:
+            sections.append("| Topic | Depth |")
+            sections.append("|-------|-------|")
+            # Overview row first
+            sections.append(
+                f"| [Overview]({area['dirname']}/overview.md) | overview |"
+            )
+            for topic in topics:
+                sections.append(
+                    f"| [{topic['name']}]({area['dirname']}/{topic['filename']}) | {topic['depth']} |"
+                )
+        else:
+            sections.append(
+                f"| [Overview]({area['dirname']}/overview.md) |"
+            )
 
     return "\n".join(sections) + "\n"
 

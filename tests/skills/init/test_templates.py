@@ -249,13 +249,74 @@ class TestRenderIndexMd(unittest.TestCase):
     def test_uses_table_format(self, mock_date):
         mock_date.today.return_value = FIXED_DATE
         result = render_index_md("Senior Python Developer", self._domain_areas())
-        self.assertIn("| Area | Overview |", result)
-        self.assertIn("|------|----------|", result)
+        # Table format with overview links per area
+        self.assertIn("| [Overview]", result)
 
     def test_empty_domain_areas(self, mock_date):
         mock_date.today.return_value = FIXED_DATE
         result = render_index_md("Generalist", [])
         self.assertIn("# Knowledge Base", result)
+
+    def test_includes_topics_when_provided(self, mock_date):
+        mock_date.today.return_value = FIXED_DATE
+        areas = [
+            {
+                "name": "Backend Development",
+                "dirname": "backend-development",
+                "topics": [
+                    {"name": "API Design", "filename": "api-design.md", "depth": "working"},
+                    {"name": "Error Handling", "filename": "error-handling.md", "depth": "working"},
+                ],
+            },
+        ]
+        result = render_index_md("Dev", areas)
+        self.assertIn("API Design", result)
+        self.assertIn("api-design.md", result)
+        self.assertIn("Error Handling", result)
+
+    def test_topics_show_depth(self, mock_date):
+        mock_date.today.return_value = FIXED_DATE
+        areas = [
+            {
+                "name": "Testing",
+                "dirname": "testing",
+                "topics": [
+                    {"name": "Unit Testing", "filename": "unit-testing.md", "depth": "working"},
+                ],
+            },
+        ]
+        result = render_index_md("Dev", areas)
+        self.assertIn("working", result)
+
+    def test_no_topics_key_shows_overview_only(self, mock_date):
+        """Backward compat: areas without 'topics' key still render overview link."""
+        mock_date.today.return_value = FIXED_DATE
+        areas = [{"name": "Testing", "dirname": "testing"}]
+        result = render_index_md("Dev", areas)
+        self.assertIn("testing/overview.md", result)
+        self.assertIn("Testing", result)
+
+    def test_no_frontmatter_in_output(self, mock_date):
+        """index.md is structural — no YAML frontmatter."""
+        mock_date.today.return_value = FIXED_DATE
+        areas = [{"name": "Testing", "dirname": "testing"}]
+        result = render_index_md("Dev", areas)
+        self.assertFalse(result.startswith("---"))
+
+    def test_ref_md_files_excluded_from_topics(self, mock_date):
+        """Reference companions should not appear as separate topic rows."""
+        mock_date.today.return_value = FIXED_DATE
+        areas = [
+            {
+                "name": "Testing",
+                "dirname": "testing",
+                "topics": [
+                    {"name": "Unit Testing", "filename": "unit-testing.md", "depth": "working"},
+                ],
+            },
+        ]
+        result = render_index_md("Dev", areas)
+        self.assertNotIn(".ref.md", result)
 
 
 @patch("templates.date")

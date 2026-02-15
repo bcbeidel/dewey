@@ -123,6 +123,27 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/health/scripts/check_kb.py --kb-root <kb_ro
 - `check_coverage` -- Every area has overview.md; every topic has .ref.md companion
 
 Every validator returns a list of issue dicts: `{"file": str, "message": str, "severity": "fail" | "warn"}`
+
+**Tier 2 pre-screening only:**
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/health/scripts/check_kb.py --kb-root <kb_root> --tier2
+```
+
+**Combined Tier 1 + Tier 2:**
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/health/scripts/check_kb.py --kb-root <kb_root> --both
+```
+
+Returns `{"tier1": {...}, "tier2": {...}}` with both Tier 1 issues/summary and Tier 2 queue/summary.
+
+**tier2_triggers.py** -- Tier 2 deterministic pre-screener
+- `trigger_source_drift` -- Flags files with stale or missing last_validated
+- `trigger_depth_accuracy` -- Flags files where word count or prose ratio mismatches depth
+- `trigger_source_primacy` -- Flags working files with low inline citation density
+- `trigger_why_quality` -- Flags working files with missing or thin "Why This Matters"
+- `trigger_concrete_examples` -- Flags working files with missing or abstract "In Practice"
+
+Every trigger returns: `{"file": str, "trigger": str, "reason": str, "context": dict}`
 </scripts_integration>
 
 <success_criteria>

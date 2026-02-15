@@ -353,3 +353,32 @@ def check_index_sync(kb_root: Path, *, knowledge_dir_name: str = "docs") -> list
                 })
 
     return issues
+
+
+def check_inventory_regression(kb_root: Path, current_files: list[str]) -> list[dict]:
+    """Warn when files from the last health snapshot are missing.
+
+    Compares *current_files* (relative paths like ``area/topic.md``)
+    against the ``file_list`` recorded in the most recent history
+    snapshot.  Returns a warning for each file that was present
+    previously but is absent now.
+    """
+    from history import read_history
+
+    issues: list[dict] = []
+    history = read_history(kb_root, limit=1)
+    if not history:
+        return issues
+
+    last_snapshot = history[-1]
+    last_files = set(last_snapshot.get("file_list", []))
+    current_set = set(current_files)
+
+    for missing in sorted(last_files - current_set):
+        issues.append({
+            "file": missing,
+            "message": f"File was present in last health check but is now missing: {missing}",
+            "severity": "warn",
+        })
+
+    return issues

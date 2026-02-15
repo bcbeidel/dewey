@@ -11,6 +11,7 @@ from validators import (
     check_cross_references,
     check_freshness,
     check_frontmatter,
+    check_inventory_regression,
     check_section_ordering,
     check_size_bounds,
     check_source_urls,
@@ -416,6 +417,71 @@ class TestCheckSourceUrls(unittest.TestCase):
         )
         issues = check_source_urls(f)
         self.assertEqual(issues, [])
+
+
+# ------------------------------------------------------------------
+# check_inventory_regression
+# ------------------------------------------------------------------
+class TestCheckInventoryRegression(unittest.TestCase):
+    """Tests for check_inventory_regression validator."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+        history_dir = self.tmpdir / ".dewey" / "history"
+        history_dir.mkdir(parents=True)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def _write_snapshot(self, file_list):
+        """Write a single history snapshot with the given file_list."""
+        import json
+        from datetime import datetime
+        log_path = self.tmpdir / ".dewey" / "history" / "health-log.jsonl"
+        entry = {
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "tier1": {"total_files": len(file_list), "fail_count": 0, "warn_count": 0, "pass_count": len(file_list)},
+            "tier2": None,
+            "file_list": file_list,
+        }
+        with log_path.open("a") as fh:
+            fh.write(json.dumps(entry) + "\n")
+
+    def test_no_history_returns_empty(self):
+        """No prior snapshots means no regression to detect."""
+        current = ["area/overview.md", "area/topic.md"]
+        issues = check_inventory_regression(self.tmpdir, current)
+        self.assertEqual(issues, [])
+
+    def test_same_files_no_issues(self):
+        """Identical file list produces no warnings."""
+        files = ["area/overview.md", "area/topic.md"]
+        self._write_snapshot(files)
+        issues = check_inventory_regression(self.tmpdir, files)
+        self.assertEqual(issues, [])
+
+    def test_missing_file_warns(self):
+        """File in last snapshot but not current produces a warning."""
+        self._write_snapshot(["area/overview.md", "area/topic.md", "area/removed.md"])
+        current = ["area/overview.md", "area/topic.md"]
+        issues = check_inventory_regression(self.tmpdir, current)
+        self.assertEqual(len(issues), 1)
+        self.assertIn("removed.md", issues[0]["message"])
+        self.assertEqual(issues[0]["severity"], "warn")
+
+    def test_added_file_no_issue(self):
+        """New file not in last snapshot is fine (not a regression)."""
+        self._write_snapshot(["area/overview.md"])
+        current = ["area/overview.md", "area/new-topic.md"]
+        issues = check_inventory_regression(self.tmpdir, current)
+        self.assertEqual(issues, [])
+
+    def test_multiple_missing_files(self):
+        """Multiple removals produce multiple warnings."""
+        self._write_snapshot(["area/a.md", "area/b.md", "area/c.md"])
+        current = ["area/a.md"]
+        issues = check_inventory_regression(self.tmpdir, current)
+        self.assertEqual(len(issues), 2)
 
 
 if __name__ == "__main__":

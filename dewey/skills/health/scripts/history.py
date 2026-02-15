@@ -22,6 +22,7 @@ def record_snapshot(
     kb_root: Path,
     tier1_summary: dict,
     tier2_summary: Optional[dict] = None,
+    file_list: Optional[list] = None,
 ) -> Path:
     """Append a timestamped health snapshot to the log file.
 
@@ -34,6 +35,9 @@ def record_snapshot(
         Summary dict from ``run_health_check``.
     tier2_summary:
         Optional summary dict from ``run_tier2_prescreening``.
+    file_list:
+        Optional list of knowledge-base file paths (relative to kb_root)
+        discovered during this check run.
 
     Returns
     -------
@@ -49,6 +53,7 @@ def record_snapshot(
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "tier1": tier1_summary,
         "tier2": tier2_summary,
+        "file_list": file_list or [],
     }
 
     with log_path.open("a") as fh:

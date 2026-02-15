@@ -183,5 +183,37 @@ class TestReadHistory(unittest.TestCase):
         self.assertIn("tier2", entry)
 
 
+class TestFileListInSnapshots(unittest.TestCase):
+    """Tests for file_list field in history snapshots."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_snapshot_includes_file_list(self):
+        """file_list is stored in the snapshot entry."""
+        files = ["area/overview.md", "area/topic.md"]
+        record_snapshot(self.tmpdir, _tier1_summary(), file_list=files)
+        log_path = self.tmpdir / ".dewey" / "history" / "health-log.jsonl"
+        entry = json.loads(log_path.read_text().strip())
+        self.assertEqual(entry["file_list"], files)
+
+    def test_file_list_defaults_to_empty(self):
+        """file_list defaults to empty list when not provided."""
+        record_snapshot(self.tmpdir, _tier1_summary())
+        log_path = self.tmpdir / ".dewey" / "history" / "health-log.jsonl"
+        entry = json.loads(log_path.read_text().strip())
+        self.assertEqual(entry["file_list"], [])
+
+    def test_file_list_preserved_in_read_history(self):
+        """read_history returns entries with file_list intact."""
+        files = ["sagemaker/overview.md", "sagemaker/mlops.md"]
+        record_snapshot(self.tmpdir, _tier1_summary(), file_list=files)
+        history = read_history(self.tmpdir)
+        self.assertEqual(history[0]["file_list"], files)
+
+
 if __name__ == "__main__":
     unittest.main()

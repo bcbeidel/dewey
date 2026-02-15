@@ -209,5 +209,121 @@ class TestRunTier2Prescreening(unittest.TestCase):
         self.assertEqual(overview_triggers, [])
 
 
+class TestTier2OutputSchema(unittest.TestCase):
+    """Validate the output schema of run_tier2_prescreening for workflow consumption."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+        self.kb = self.tmpdir / "docs"
+        self.kb.mkdir()
+
+        # Create test data that triggers multiple trigger types.
+        area = self.kb / "area-one"
+        area.mkdir()
+
+        # A stale overview file — triggers source_drift (old last_validated)
+        stale_md = (
+            "---\n"
+            "sources:\n"
+            "  - https://example.com/doc\n"
+            "last_validated: 2020-01-01\n"
+            "relevance: core\n"
+            "depth: overview\n"
+            "---\n"
+            "\n"
+            "# Topic\n"
+            "\n"
+            "Content here.\n"
+        )
+        _write(area / "overview.md", stale_md)
+
+        # A thin working-depth file — triggers depth_accuracy (too few words),
+        # why_quality (missing section), concrete_examples (no concrete elements),
+        # and source_primacy (no inline sources).
+        thin_working_md = (
+            "---\n"
+            "sources:\n"
+            "  - https://example.com/doc\n"
+            "last_validated: 2020-01-01\n"
+            "relevance: core\n"
+            "depth: working\n"
+            "---\n"
+            "\n"
+            "# Topic\n"
+            "\n"
+            "## Key Guidance\n"
+            "- Do the thing\n"
+            "- Do the other thing\n"
+            "- And another thing\n"
+            "\n"
+            "## In Practice\n"
+            "Just some text without concrete elements.\n"
+        )
+        _write(area / "topic.md", thin_working_md)
+
+        self.result = run_tier2_prescreening(self.tmpdir)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    # ------------------------------------------------------------------
+    # test_queue_item_schema
+    # ------------------------------------------------------------------
+    def test_queue_item_schema(self):
+        """Every queue item must have file, trigger, reason, context keys;
+        context must be a dict."""
+        queue = self.result["queue"]
+        self.assertTrue(len(queue) > 0, "Expected at least one queue item")
+
+        required_keys = {"file", "trigger", "reason", "context"}
+        for item in queue:
+            for key in required_keys:
+                self.assertIn(key, item, f"Missing key '{key}' in queue item: {item}")
+            self.assertIsInstance(
+                item["context"], dict,
+                f"context should be a dict, got {type(item['context']).__name__}",
+            )
+
+    # ------------------------------------------------------------------
+    # test_trigger_counts_match_queue
+    # ------------------------------------------------------------------
+    def test_trigger_counts_match_queue(self):
+        """Summary trigger_counts must match actual counts from the queue."""
+        queue = self.result["queue"]
+        summary_counts = self.result["summary"]["trigger_counts"]
+
+        # Count triggers from the queue directly
+        actual_counts: dict[str, int] = {}
+        for item in queue:
+            t = item["trigger"]
+            actual_counts[t] = actual_counts.get(t, 0) + 1
+
+        self.assertEqual(
+            summary_counts, actual_counts,
+            f"trigger_counts mismatch: summary={summary_counts}, actual={actual_counts}",
+        )
+
+    # ------------------------------------------------------------------
+    # test_valid_trigger_names
+    # ------------------------------------------------------------------
+    def test_valid_trigger_names(self):
+        """Every trigger name must be one of the 5 known triggers."""
+        known_triggers = {
+            "source_drift",
+            "depth_accuracy",
+            "source_primacy",
+            "why_quality",
+            "concrete_examples",
+        }
+        queue = self.result["queue"]
+        self.assertTrue(len(queue) > 0, "Expected at least one queue item")
+
+        for item in queue:
+            self.assertIn(
+                item["trigger"], known_triggers,
+                f"Unknown trigger '{item['trigger']}' in queue item: {item}",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

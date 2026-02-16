@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # config.py lives in init/scripts/ — add it to sys.path for cross-skill import.
@@ -132,6 +133,8 @@ def run_health_check(kb_root: Path, *, _persist_history: bool = True) -> dict:
     return result
 
 
+_LOW_UTIL_MIN_OVERVIEW_READS = 10
+
 _TIER2_TRIGGERS = [
     trigger_source_drift,
     trigger_depth_accuracy,
@@ -247,8 +250,6 @@ def generate_recommendations(
         ``{"recommendations": [...], "summary": {...}}``
         or ``{"recommendations": [], "skipped": str}`` if gating fails.
     """
-    from datetime import datetime
-
     knowledge_dir_name = read_knowledge_dir(kb_root)
     md_files = _discover_md_files(kb_root, knowledge_dir_name)
     knowledge_dir = kb_root / knowledge_dir_name
@@ -405,7 +406,6 @@ def generate_recommendations(
             classified.add(rel_path)
 
     # Priority 3: low_utilization
-    _LOW_UTIL_MIN_OVERVIEW_READS = 10
     for area_name, area_data in sorted(areas.items()):
         overview_reads = area_data["overview_reads"]
         if overview_reads < _LOW_UTIL_MIN_OVERVIEW_READS:

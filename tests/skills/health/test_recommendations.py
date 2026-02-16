@@ -450,6 +450,19 @@ class TestCLI(unittest.TestCase):
         parsed = json.loads(result.stdout)
         self.assertIn("skipped", parsed)
 
+    def test_recommendations_with_tier2(self):
+        """--tier2 --recommendations includes both sections."""
+        now = datetime.now().isoformat(timespec="seconds")
+        _write_utilization_log(self.tmpdir, [
+            _log_entry("docs/area/overview.md", now),
+        ])
+        result = self._run("--tier2", "--recommendations", "--min-reads", "0", "--min-days", "0")
+        self.assertEqual(result.returncode, 0)
+        parsed = json.loads(result.stdout)
+        self.assertIn("tier2", parsed)
+        self.assertIn("recommendations", parsed)
+        self.assertNotIn("tier1", parsed)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,11 +17,58 @@ def _write(path: Path, text: str) -> Path:
     return path
 
 
-def _valid_md(depth: str = "working", extra_body: str = "") -> str:
-    """Return a minimal valid markdown document with proper frontmatter."""
+def _valid_md(depth: str = "working", extra_body: str = "", stem: str = "topic") -> str:
+    """Return a minimal valid markdown document with proper frontmatter.
+
+    Produces depth-appropriate sections so all validators pass cleanly:
+    - working: 5 required sections + ref link in Go Deeper + external link
+    - overview: What This Covers + How It's Organized
+    - reference: See also with companion link
+    """
     today = date.today().isoformat()
-    # Ensure enough lines to pass size bounds for the given depth
     padding = "\n".join([f"Line {i}" for i in range(15)])
+
+    if depth == "working":
+        sections = (
+            f"# Topic\n"
+            f"\n"
+            f"## Why This Matters\n"
+            f"Explains why this topic is important.\n"
+            f"\n"
+            f"## In Practice\n"
+            f"Concrete guidance here.\n"
+            f"\n"
+            f"## Key Guidance\n"
+            f"Abstract principles here.\n"
+            f"\n"
+            f"## Watch Out For\n"
+            f"Common pitfalls.\n"
+            f"\n"
+            f"## Go Deeper\n"
+            f"- [{stem} Reference]({stem}.ref.md) -- quick-lookup version\n"
+            f"- [External resource](https://example.com/resource)\n"
+        )
+    elif depth == "overview":
+        sections = (
+            f"# Overview\n"
+            f"\n"
+            f"## What This Covers\n"
+            f"Scope of this area.\n"
+            f"\n"
+            f"## How It's Organized\n"
+            f"Structure of this area.\n"
+        )
+    elif depth == "reference":
+        sections = (
+            f"# Reference\n"
+            f"\n"
+            f"Quick lookup content.\n"
+            f"\n"
+            f"**See also:** [{stem}]({stem}.md)\n"
+        )
+    else:
+        sections = "# Topic\n\nBody content.\n"
+
     return (
         f"---\n"
         f"sources:\n"
@@ -31,14 +78,7 @@ def _valid_md(depth: str = "working", extra_body: str = "") -> str:
         f"depth: {depth}\n"
         f"---\n"
         f"\n"
-        f"# Topic\n"
-        f"\n"
-        f"## In Practice\n"
-        f"Concrete guidance here.\n"
-        f"\n"
-        f"## Key Guidance\n"
-        f"Abstract principles here.\n"
-        f"\n"
+        f"{sections}\n"
         f"{padding}\n"
         f"{extra_body}\n"
     )
@@ -572,19 +612,84 @@ class TestCitationQualityIntegration(unittest.TestCase):
         area = self.kb / "area"
         area.mkdir()
         _write(area / "overview.md", _valid_md("overview"))
-        # extra_body is appended after ## Key Guidance + padding in _valid_md,
-        # so these links land inside the Key Guidance section (before any new ##).
-        body = (
-            "- A [s](https://example.com/dup)\n"
-            "- B [s](https://example.com/dup)\n"
-            "- C [s](https://example.com/dup)\n"
+        # Build a working doc with duplicate citations inside Key Guidance
+        today = date.today().isoformat()
+        dup_working = (
+            f"---\nsources:\n  - https://example.com/doc\n"
+            f"last_validated: {today}\nrelevance: core\ndepth: working\n---\n\n"
+            f"# Topic\n\n"
+            f"## Why This Matters\nImportant topic.\n\n"
+            f"## In Practice\nConcrete guidance here.\n\n"
+            f"## Key Guidance\n"
+            f"- A [s](https://example.com/dup)\n"
+            f"- B [s](https://example.com/dup)\n"
+            f"- C [s](https://example.com/dup)\n\n"
+            f"## Watch Out For\nPitfalls.\n\n"
+            f"## Go Deeper\n"
+            f"- [topic Reference](topic.ref.md) -- quick-lookup version\n"
+            f"- [External](https://example.com/resource)\n"
         )
-        _write(area / "topic.md", _valid_md("working", extra_body=body))
+        _write(area / "topic.md", dup_working)
         _write(area / "topic.ref.md", _valid_md("reference"))
 
         result = run_tier2_prescreening(self.tmpdir)
         citation_items = [i for i in result["queue"] if i["trigger"] == "citation_quality"]
         self.assertTrue(len(citation_items) > 0)
+
+
+class TestNewValidatorsIntegration(unittest.TestCase):
+    """Verify new validators fire through run_health_check pipeline."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+        self.kb = self.tmpdir / "docs"
+        self.kb.mkdir()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_section_completeness_fires(self):
+        """Working file missing sections produces warnings through pipeline."""
+        area = self.kb / "area"
+        area.mkdir()
+        _write(area / "overview.md", _valid_md("overview"))
+        today = date.today().isoformat()
+        # Working file with only In Practice + Key Guidance (missing 3 sections)
+        bare_working = (
+            f"---\nsources:\n  - https://example.com/doc\n"
+            f"last_validated: {today}\nrelevance: core\ndepth: working\n---\n\n"
+            f"# Topic\n\n## In Practice\nText.\n\n## Key Guidance\nText.\n"
+            + "\n".join([f"Line {i}" for i in range(15)]) + "\n"
+        )
+        _write(area / "topic.md", bare_working)
+        _write(area / "topic.ref.md", _valid_md("reference"))
+        result = run_health_check(self.tmpdir)
+        section_issues = [
+            i for i in result["issues"]
+            if "Missing required section" in i.get("message", "")
+        ]
+        self.assertTrue(len(section_issues) >= 3)
+
+    def test_heading_hierarchy_fires(self):
+        """File with heading issues produces warnings through pipeline."""
+        area = self.kb / "area"
+        area.mkdir()
+        _write(area / "overview.md", _valid_md("overview"))
+        today = date.today().isoformat()
+        bad_headings = (
+            f"---\nsources:\n  - https://example.com/doc\n"
+            f"last_validated: {today}\nrelevance: core\ndepth: working\n---\n\n"
+            f"# Title\n\n# Second Title\n\n### Skipped\n"
+            + "\n".join([f"Line {i}" for i in range(15)]) + "\n"
+        )
+        _write(area / "topic.md", bad_headings)
+        _write(area / "topic.ref.md", _valid_md("reference"))
+        result = run_health_check(self.tmpdir)
+        heading_issues = [
+            i for i in result["issues"]
+            if "H1" in i.get("message", "") or "Skipped" in i.get("message", "")
+        ]
+        self.assertTrue(len(heading_issues) >= 2)
 
 
 if __name__ == "__main__":

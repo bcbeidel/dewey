@@ -11,7 +11,11 @@ from validators import (
     check_cross_references,
     check_freshness,
     check_frontmatter,
+    check_go_deeper_links,
+    check_heading_hierarchy,
     check_inventory_regression,
+    check_ref_see_also,
+    check_section_completeness,
     check_section_ordering,
     check_size_bounds,
     check_source_urls,
@@ -490,6 +494,276 @@ class TestCheckInventoryRegression(unittest.TestCase):
         current = ["area/a.md"]
         issues = check_inventory_regression(self.tmpdir, current)
         self.assertEqual(len(issues), 2)
+
+
+# ------------------------------------------------------------------
+# check_section_completeness
+# ------------------------------------------------------------------
+class TestCheckSectionCompleteness(unittest.TestCase):
+    """Tests for check_section_completeness validator."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+        self.today = date.today().isoformat()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def _fm(self, depth: str) -> str:
+        return (
+            f"---\nsources:\n  - https://x.com\nlast_validated: {self.today}\n"
+            f"relevance: core\ndepth: {depth}\n---\n"
+        )
+
+    def test_complete_working_passes(self):
+        doc = (
+            self._fm("working")
+            + "\n# Topic\n\n"
+            + "## Why This Matters\nText.\n\n"
+            + "## In Practice\nText.\n\n"
+            + "## Key Guidance\nText.\n\n"
+            + "## Watch Out For\nText.\n\n"
+            + "## Go Deeper\nText.\n"
+        )
+        f = _write(self.tmpdir / "a.md", doc)
+        self.assertEqual(check_section_completeness(f), [])
+
+    def test_missing_working_section_warns(self):
+        doc = (
+            self._fm("working")
+            + "\n# Topic\n\n"
+            + "## In Practice\nText.\n\n"
+            + "## Key Guidance\nText.\n"
+        )
+        f = _write(self.tmpdir / "a.md", doc)
+        issues = check_section_completeness(f)
+        missing_names = [i["message"] for i in issues]
+        self.assertTrue(any("Why This Matters" in m for m in missing_names))
+        self.assertTrue(any("Watch Out For" in m for m in missing_names))
+        self.assertTrue(any("Go Deeper" in m for m in missing_names))
+
+    def test_complete_overview_passes(self):
+        doc = (
+            self._fm("overview")
+            + "\n# Overview\n\n"
+            + "## What This Covers\nText.\n\n"
+            + "## How It's Organized\nText.\n"
+        )
+        f = _write(self.tmpdir / "a.md", doc)
+        self.assertEqual(check_section_completeness(f), [])
+
+    def test_missing_overview_section_warns(self):
+        doc = self._fm("overview") + "\n# Overview\n\n## What This Covers\nText.\n"
+        f = _write(self.tmpdir / "a.md", doc)
+        issues = check_section_completeness(f)
+        self.assertTrue(any("How It's Organized" in i["message"] for i in issues))
+
+    def test_reference_with_body_passes(self):
+        doc = self._fm("reference") + "\nSome reference content.\n"
+        f = _write(self.tmpdir / "a.md", doc)
+        self.assertEqual(check_section_completeness(f), [])
+
+    def test_reference_empty_body_warns(self):
+        doc = self._fm("reference") + "\n"
+        f = _write(self.tmpdir / "a.md", doc)
+        issues = check_section_completeness(f)
+        self.assertTrue(len(issues) > 0)
+        self.assertTrue(any("no content" in i["message"].lower() for i in issues))
+
+    def test_no_depth_skips(self):
+        doc = "---\nsources:\n  - https://x.com\nrelevance: core\n---\n\n# Topic\n"
+        f = _write(self.tmpdir / "a.md", doc)
+        self.assertEqual(check_section_completeness(f), [])
+
+    def test_severity_is_warn(self):
+        doc = self._fm("working") + "\n# Topic\n"
+        f = _write(self.tmpdir / "a.md", doc)
+        issues = check_section_completeness(f)
+        self.assertTrue(all(i["severity"] == "warn" for i in issues))
+
+
+# ------------------------------------------------------------------
+# check_heading_hierarchy
+# ------------------------------------------------------------------
+class TestCheckHeadingHierarchy(unittest.TestCase):
+    """Tests for check_heading_hierarchy validator."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_valid_hierarchy_passes(self):
+        doc = "---\ndepth: working\n---\n\n# Title\n\n## Section\n\n### Sub\n"
+        f = _write(self.tmpdir / "a.md", doc)
+        self.assertEqual(check_heading_hierarchy(f), [])
+
+    def test_multiple_h1_warns(self):
+        doc = "---\ndepth: working\n---\n\n# Title One\n\n# Title Two\n"
+        f = _write(self.tmpdir / "a.md", doc)
+        issues = check_heading_hierarchy(f)
+        self.assertTrue(any("Multiple H1" in i["message"] for i in issues))
+
+    def test_no_h1_warns(self):
+        doc = "---\ndepth: working\n---\n\n## Just a Section\n"
+        f = _write(self.tmpdir / "a.md", doc)
+        issues = check_heading_hierarchy(f)
+        self.assertTrue(any("No H1" in i["message"] for i in issues))
+
+    def test_skipped_level_warns(self):
+        doc = "---\ndepth: working\n---\n\n# Title\n\n### Skipped H2\n"
+        f = _write(self.tmpdir / "a.md", doc)
+        issues = check_heading_hierarchy(f)
+        self.assertTrue(any("Skipped" in i["message"] for i in issues))
+
+    def test_code_blocks_excluded(self):
+        doc = (
+            "---\ndepth: working\n---\n\n# Title\n\n## Section\n\n"
+            "```markdown\n# This is inside a code block\n"
+            "### Also inside\n```\n"
+        )
+        f = _write(self.tmpdir / "a.md", doc)
+        issues = check_heading_hierarchy(f)
+        self.assertEqual(issues, [])
+
+    def test_severity_is_warn(self):
+        doc = "---\ndepth: working\n---\n\n# One\n\n# Two\n\n### Skip\n"
+        f = _write(self.tmpdir / "a.md", doc)
+        issues = check_heading_hierarchy(f)
+        self.assertTrue(all(i["severity"] == "warn" for i in issues))
+
+    def test_no_frontmatter_still_works(self):
+        doc = "# Title\n\n## Section\n"
+        f = _write(self.tmpdir / "a.md", doc)
+        self.assertEqual(check_heading_hierarchy(f), [])
+
+
+# ------------------------------------------------------------------
+# check_go_deeper_links
+# ------------------------------------------------------------------
+class TestCheckGoDeeperLinks(unittest.TestCase):
+    """Tests for check_go_deeper_links validator."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+        self.today = date.today().isoformat()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def _working_fm(self) -> str:
+        return (
+            f"---\nsources:\n  - https://x.com\nlast_validated: {self.today}\n"
+            f"relevance: core\ndepth: working\n---\n"
+        )
+
+    def test_valid_go_deeper_passes(self):
+        doc = (
+            self._working_fm()
+            + "\n# Topic\n\n## Go Deeper\n"
+            + "- [Ref](bidding.ref.md)\n"
+            + "- [External](https://example.com/docs)\n"
+        )
+        f = _write(self.tmpdir / "bidding.md", doc)
+        self.assertEqual(check_go_deeper_links(f), [])
+
+    def test_missing_ref_link_warns(self):
+        doc = (
+            self._working_fm()
+            + "\n# Topic\n\n## Go Deeper\n"
+            + "- [External](https://example.com/docs)\n"
+        )
+        f = _write(self.tmpdir / "bidding.md", doc)
+        issues = check_go_deeper_links(f)
+        self.assertTrue(any("bidding.ref.md" in i["message"] for i in issues))
+
+    def test_missing_external_link_warns(self):
+        doc = (
+            self._working_fm()
+            + "\n# Topic\n\n## Go Deeper\n"
+            + "- [Ref](bidding.ref.md)\n"
+        )
+        f = _write(self.tmpdir / "bidding.md", doc)
+        issues = check_go_deeper_links(f)
+        self.assertTrue(any("external link" in i["message"].lower() for i in issues))
+
+    def test_both_missing_warns_twice(self):
+        doc = self._working_fm() + "\n# Topic\n\n## Go Deeper\nSome text.\n"
+        f = _write(self.tmpdir / "bidding.md", doc)
+        issues = check_go_deeper_links(f)
+        self.assertEqual(len(issues), 2)
+
+    def test_non_working_skips(self):
+        doc = (
+            f"---\nsources:\n  - https://x.com\nlast_validated: {self.today}\n"
+            f"relevance: core\ndepth: overview\n---\n"
+            + "\n# Topic\n\n## Go Deeper\nNo links.\n"
+        )
+        f = _write(self.tmpdir / "overview.md", doc)
+        self.assertEqual(check_go_deeper_links(f), [])
+
+    def test_missing_section_skips(self):
+        doc = self._working_fm() + "\n# Topic\n\n## In Practice\nText.\n"
+        f = _write(self.tmpdir / "bidding.md", doc)
+        self.assertEqual(check_go_deeper_links(f), [])
+
+    def test_ref_file_skips(self):
+        doc = self._working_fm() + "\n# Topic\n\n## Go Deeper\nNo links.\n"
+        f = _write(self.tmpdir / "bidding.ref.md", doc)
+        self.assertEqual(check_go_deeper_links(f), [])
+
+
+# ------------------------------------------------------------------
+# check_ref_see_also
+# ------------------------------------------------------------------
+class TestCheckRefSeeAlso(unittest.TestCase):
+    """Tests for check_ref_see_also validator."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+        self.today = date.today().isoformat()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def _ref_fm(self) -> str:
+        return (
+            f"---\nsources:\n  - https://x.com\nlast_validated: {self.today}\n"
+            f"relevance: core\ndepth: reference\n---\n"
+        )
+
+    def test_valid_see_also_passes(self):
+        doc = self._ref_fm() + "\n# Reference\n\nContent.\n\n**See also:** [Bidding](bidding.md)\n"
+        f = _write(self.tmpdir / "bidding.ref.md", doc)
+        self.assertEqual(check_ref_see_also(f), [])
+
+    def test_missing_see_also_warns(self):
+        doc = self._ref_fm() + "\n# Reference\n\nContent only, no see also.\n"
+        f = _write(self.tmpdir / "bidding.ref.md", doc)
+        issues = check_ref_see_also(f)
+        self.assertTrue(any("See also" in i["message"] for i in issues))
+
+    def test_wrong_companion_warns(self):
+        doc = self._ref_fm() + "\n# Reference\n\n**See also:** [Other](other.md)\n"
+        f = _write(self.tmpdir / "bidding.ref.md", doc)
+        issues = check_ref_see_also(f)
+        self.assertTrue(any("bidding.md" in i["message"] for i in issues))
+
+    def test_case_insensitive_see_also(self):
+        doc = self._ref_fm() + "\n# Reference\n\n**SEE ALSO:** [Bidding](bidding.md)\n"
+        f = _write(self.tmpdir / "bidding.ref.md", doc)
+        self.assertEqual(check_ref_see_also(f), [])
+
+    def test_non_ref_file_skips(self):
+        doc = self._ref_fm() + "\n# Topic\n\nNo see also.\n"
+        f = _write(self.tmpdir / "bidding.md", doc)
+        self.assertEqual(check_ref_see_also(f), [])
+
+    def test_hyphenated_filename(self):
+        doc = self._ref_fm() + "\n# Reference\n\n**See also:** [Ad Serving](ad-serving.md)\n"
+        f = _write(self.tmpdir / "ad-serving.ref.md", doc)
+        self.assertEqual(check_ref_see_also(f), [])
 
 
 if __name__ == "__main__":

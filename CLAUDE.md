@@ -13,7 +13,7 @@ No build step. No dependencies beyond Python 3.9+ stdlib.
 
 ## Architecture
 
-Dewey is a Claude Code plugin that helps build, curate, and maintain structured knowledge bases. The output is provider-agnostic -- it works with any agent (Claude Code, Codex, Gemini CLI, Cursor, etc.).
+Dewey is a Claude Code plugin that helps build, curate, and maintain structured knowledge bases. The knowledge base output format is designed to be provider-agnostic, but Dewey currently only runs as a Claude Code plugin. Cross-provider support is a future goal.
 
 ### Plugin Structure
 
@@ -83,4 +83,5 @@ All validators and triggers return `list[dict]` (always a list, even if empty):
 ## Known Limitations
 
 - Tier 3 human decision queue: designed in `health-review.md` but not yet tested
-- Utilization auto-capture: hook exists but provider-agnostic fallback not yet implemented
+- Utilization auto-capture: hook exists but auto-capture not yet wired up
+- Cross-provider support: KB output format is provider-agnostic by design, but Dewey currently only runs as a Claude Code plugin

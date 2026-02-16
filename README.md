@@ -6,7 +6,7 @@ Dewey is a Claude Code plugin that helps you build, curate, and maintain structu
 
 AI agents produce better outputs when they have access to curated, relevant knowledge. But knowledge bases serve two consumers: the **agent** (who needs structured, token-efficient context) and the **human** (who needs readable, navigable content). Dewey defines a standard for what a well-formed knowledge base looks like and provides skills to create and maintain one.
 
-The spec is provider-agnostic -- the output works with any agent (Claude Code, Codex, Gemini CLI, Cursor, etc.).
+Dewey currently runs as a Claude Code plugin. The knowledge base output format is designed to be provider-agnostic -- cross-provider support (Codex, Gemini CLI, Cursor, etc.) is a future goal.
 
 ## Skills
 
@@ -157,6 +157,7 @@ tests/                                # Test suite (483 tests)
 | Health history and baselines | Complete |
 | Utilization tracking | Infrastructure complete, auto-capture pending |
 | Tier 3 human decision queue | Designed, not yet tested |
+| Cross-provider support (Codex, Gemini CLI, Cursor) | Planned |
 
 ## Documentation
 

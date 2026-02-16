@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "dewey",
-      "description": "Knowledge base management plugin for Claude Code - scaffold, curate, validate, and explore structured knowledge bases",
+      "description": "Knowledge base management plugin for Claude Code - scaffold, curate, and validate structured knowledge bases",
       "source": "./dewey",
       "category": "productivity"
     }

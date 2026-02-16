@@ -12,57 +12,46 @@ The spec is provider-agnostic -- the output works with any agent (Claude Code, C
 
 | Skill | Purpose |
 |-------|---------|
-| `/dewey:init` | Bootstrap a new knowledge base with directory structure, AGENTS.md, and templates |
-| `/dewey:curate` | Add topics, propose additions, promote proposals, ingest from URLs |
+| `/dewey:curate` | Single entry point for all KB content operations: discover domains, scaffold structure, add/update topics, ingest URLs, manage proposals and curation plan |
 | `/dewey:health` | Validate quality, check freshness, analyze coverage gaps, generate reports |
-| `/dewey:explore` | Discover what knowledge domains to capture through guided conversation |
-
-### `/dewey:init`
-
-Scaffolds a new knowledge base. Provide a role name and optionally domain areas:
-
-```
-/dewey:init --role "Platform Engineer" --areas "Infrastructure,Observability,CI/CD"
-```
-
-Creates: AGENTS.md (persona + manifest), CLAUDE.md (agent instructions), docs/ directory with overview files per area, and the `.dewey/` metadata directories.
 
 ### `/dewey:curate`
 
-Manages the content lifecycle:
+The curate skill uses free-text intake -- describe what you want and Claude routes to the right workflow. No subcommands needed.
 
-- **add** -- Research a topic, draft working-knowledge and reference files, update all indexes
+**Workflows:**
+
+- **discover** -- Guided conversation to identify what knowledge domains matter for a role, then scaffold the structure
+- **setup** -- Bootstrap a new knowledge base with directory structure, AGENTS.md, and templates
+- **add** -- Research a topic, draft working-knowledge and reference files, update all indexes (also supports updating existing topics)
 - **propose** -- Submit a topic proposal for review before committing
 - **promote** -- Move a validated proposal into a domain area
-- **ingest** -- Ingest an external URL, evaluate against existing knowledge base, then propose new content or update existing topics
+- **ingest** -- Ingest an external URL, evaluate source quality, then propose new content or update existing topics
+- **plan** -- Create or update a curation plan that tracks coverage goals
 
 ```
-/dewey:curate add Project Structure in python-foundations
-/dewey:curate propose "Dependency Injection" --rationale "Coverage gap"
-/dewey:curate promote dependency-injection --target-area python-foundations
+# Just tell it what you want:
+/dewey:curate I want to start a knowledge base for platform engineering
+/dewey:curate add a topic about dependency injection in python-foundations
+/dewey:curate ingest https://example.com/article-about-observability
+/dewey:curate what's in my curation plan?
 ```
 
 ### `/dewey:health`
 
-Validates knowledge base quality with deterministic checks (Tier 1):
+Three-tier health model for knowledge base validation:
 
-- Frontmatter completeness (sources, last_validated, relevance, depth)
-- Section ordering for working-knowledge files
-- Cross-reference integrity
-- Size bounds per depth level
-- Coverage gaps (missing overviews, missing reference companions)
-- Freshness (staleness by last_validated date)
-- Source URL format validation
+**Tier 1 -- Deterministic (Python):** 18 validators in `validators.py` plus 6 cross-file validators in `cross_validators.py`. Checks frontmatter, section ordering, cross-references, size bounds, coverage gaps, freshness, source URLs, readability (Flesch-Kincaid), duplicate content, naming conventions, and more. Auto-fix available for common issues.
+
+**Tier 2 -- LLM-Assisted (Claude):** Pre-screener with 5 triggers in `tier2_triggers.py` flags files needing deeper review. Claude evaluates: source drift, depth accuracy, why-quality, in-practice concreteness, source primacy.
+
+**Tier 3 -- Human Judgment:** Surfaces decisions requiring human input: relevance questions, scope decisions, pending proposals, conflict resolution.
 
 ```
-/dewey:health check
-/dewey:health freshness
-/dewey:health coverage
+/dewey:health check my knowledge base
+/dewey:health what's gone stale?
+/dewey:health run a full audit
 ```
-
-### `/dewey:explore`
-
-Guided discovery conversation to identify what knowledge domains matter for a role, before committing to structure.
 
 ## Knowledge Base Structure
 
@@ -79,9 +68,9 @@ project-root/
       <topic>.ref.md                 # Expert reference (depth: reference)
     _proposals/                      # Staged additions pending review
   .dewey/
-    health/                          # Quality scores
-    history/                         # Change log
-    utilization/                     # Reference tracking
+    health/                          # Quality scores and tier 2 reports
+    history/                         # Health check snapshots over time
+    utilization/                     # Reference tracking log
 ```
 
 Every knowledge file carries YAML frontmatter: `sources`, `last_validated`, `relevance`, and `depth`.
@@ -135,43 +124,42 @@ python3 -m pytest tests/ -v
 dewey/
   .claude-plugin/plugin.json         # Plugin manifest
   skills/
-    init/                             # Knowledge base bootstrapping
+    curate/                           # All KB content operations
       SKILL.md
-      scripts/scaffold.py, templates.py
-      workflows/init.md
-      references/kb-spec-summary.md
-    curate/                           # Content lifecycle
-      SKILL.md
-      scripts/create_topic.py, propose.py, promote.py
-      workflows/curate-add.md, curate-propose.md, curate-promote.md, curate-ingest.md
+      scripts/create_topic.py, propose.py, promote.py, scaffold.py, templates.py, config.py
+      workflows/curate-discover.md, curate-setup.md, curate-add.md, curate-propose.md,
+               curate-promote.md, curate-ingest.md, curate-plan.md
+      references/kb-spec-summary.md, source-evaluation.md
     health/                           # Quality validation
       SKILL.md
-      scripts/validators.py, check_kb.py
-      workflows/health-check.md, health-audit.md, health-review.md, health-coverage.md, health-freshness.md
-      references/validation-rules.md, quality-dimensions.md
-    explore/                          # Domain discovery
-      SKILL.md
-      workflows/explore-discovery.md
+      scripts/validators.py, cross_validators.py, auto_fix.py, check_kb.py,
+              tier2_triggers.py, history.py, utilization.py, log_access.py
+      workflows/health-check.md, health-audit.md, health-review.md,
+               health-coverage.md, health-freshness.md
+      references/validation-rules.md, quality-dimensions.md, design-principles.md
 docs/plans/                           # Design documents
-tests/                                # Test suite (185 tests)
+tests/                                # Test suite (483 tests)
 ```
 
 ## Status
 
-**v1.0.0** -- Core skills implemented and tested.
-
 | Feature | Status |
 |---------|--------|
-| Knowledge base scaffolding (`/dewey:init`) | Complete |
-| Content lifecycle (`/dewey:curate add/propose/promote`) | Complete |
-| URL ingestion (`/dewey:curate ingest`) | Complete |
-| Tier 1 deterministic health checks | Complete (7 validators) |
-| Tier 2 LLM-assisted health assessments | Designed, not yet implemented |
-| Domain discovery (`/dewey:explore`) | Complete |
-| Utilization tracking | Infrastructure scaffolded |
-| History / baselines | Infrastructure scaffolded |
+| Knowledge base scaffolding | Complete |
+| Domain discovery | Complete |
+| Content lifecycle (add, propose, promote) | Complete |
+| URL ingestion with source evaluation | Complete |
+| Curation plan management | Complete |
+| Tier 1 deterministic health checks | Complete (18 validators + 6 cross-validators) |
+| Tier 2 LLM-assisted health assessments | Complete (5 triggers + audit workflow) |
+| Readability and duplicate content detection | Complete |
+| Auto-fix for common issues | Complete |
+| Health history and baselines | Complete |
+| Utilization tracking | Infrastructure complete, auto-capture pending |
+| Tier 3 human decision queue | Designed, not yet tested |
 
 ## Documentation
 
 - [Knowledge Base Specification](docs/plans/2026-02-14-knowledge-base-spec-design.md) -- The full design spec
 - [Implementation Plan](docs/plans/2026-02-14-kb-skills-implementation.md) -- How the skills were built (completed)
+- [Curate Redesign](docs/plans/2026-02-15-curate-redesign.md) -- Consolidation of explore/init/curate into a single skill

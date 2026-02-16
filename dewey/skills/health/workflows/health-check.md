@@ -15,7 +15,7 @@ Verify the resolved knowledge base root:
 - The knowledge base directory must exist
 - `AGENTS.md` should exist (warn if missing but continue -- health checks can still run on the knowledge base directory)
 
-If no knowledge base root can be found, report: "No knowledge base found. Looked for the knowledge base directory (configured in `.dewey/config.json`, defaults to `docs/`) in the current directory and up to 3 parent directories. Use `/dewey:init` to create one."
+If no knowledge base root can be found, report: "No knowledge base found. Looked for the knowledge base directory (configured in `.dewey/config.json`, defaults to `docs/`) in the current directory and up to 3 parent directories. Use `/dewey:curate` to create one."
 
 ## Step 2: Run Tier 1 validators
 

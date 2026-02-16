@@ -13,7 +13,7 @@ Read `AGENTS.md` from the knowledge base root. Extract these three things:
    - **Domain areas** -- Each H3 heading (e.g., `### python-foundations`)
    - **Topics per area** -- Rows in the markdown table under each H3 (columns: Topic, Description). An area with no table rows is empty.
 
-If AGENTS.md does not exist, report: "No AGENTS.md found. Use `/dewey:init` to create one."
+If AGENTS.md does not exist, report: "No AGENTS.md found. Use `/dewey:curate` to create one."
 
 ## Step 2: Scan knowledge base contents
 

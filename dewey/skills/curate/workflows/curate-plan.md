@@ -22,7 +22,7 @@ Parse `$ARGUMENTS` after `plan`. Valid invocations:
 Look for `.dewey/curation-plan.md` in the knowledge base root.
 
 **If the file does not exist** and the action is **view**:
-- Inform the user: "No curation plan found. Use `/dewey:curate plan add <topic> in <area>` to start one, or run `/dewey:init` to generate one from starter topics."
+- Inform the user: "No curation plan found. Tell me what you'd like to add, and I'll build a plan as part of the process."
 
 **If the file does not exist** and the action is **add**:
 - Create the file with frontmatter (`last_updated: <today>`) and the standard header before adding the item.

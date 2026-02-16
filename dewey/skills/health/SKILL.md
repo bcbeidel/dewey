@@ -38,7 +38,7 @@ Validating knowledge base quality.
 
 **Before routing, check if a curation plan exists:**
 
-1. **No knowledge base initialized** (no AGENTS.md or knowledge base directory) -- Suggest `/dewey:init` first. Do not proceed.
+1. **No knowledge base initialized** (no AGENTS.md or knowledge base directory) -- Suggest `/dewey:curate` first. Do not proceed.
 2. **Knowledge base exists but no `.dewey/curation-plan.md`** -- Pause and build a plan:
    - Read AGENTS.md to understand the role and domain areas
    - Read the knowledge base directory structure to see what topics already exist

@@ -1,22 +1,19 @@
 <objective>
-Create a new topic in a domain area, research primary sources, and draft initial content for the user's review.
+Create or update a topic in a domain area, research primary sources, and draft initial content for the user's review.
 </objective>
 
 <process>
-## Step 1: Parse arguments and resolve defaults
+## Step 1: Resolve topic and area from intake context
 
-Parse `$ARGUMENTS` for the topic name. Examples of valid invocations:
+The intake classifier has already identified the user's intent. Extract:
 
-- `/dewey:curate add Bid Strategies` -- topic name only
-- `/dewey:curate add Bid Strategies in campaign-management` -- topic name + area
-- `/dewey:curate add Bid Strategies --area campaign-management --relevance supporting` -- explicit flags
-
-**Defaults:**
-- **Relevance** defaults to `core` unless specified
-- **Domain area** -- auto-detect:
-  1. If only one domain area exists under `docs/`, use it
-  2. If specified in arguments (after "in" or via `--area`), use that
+- **Topic name** — from the user's free-text input
+- **Domain area** — auto-detect:
+  1. If only one domain area exists under the knowledge directory, use it
+  2. If the user mentioned an area, use that
   3. Otherwise, list available areas and ask the user to pick one
+- **Relevance** — default to `core` unless the user specified otherwise
+- **Mode** — `new` (create topic) or `update` (modify existing topic). The intake classifier sets this.
 
 Do NOT ask the user for information that can be inferred. Get moving quickly.
 
@@ -29,6 +26,14 @@ Run the create_topic script:
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/curate/scripts/create_topic.py --kb-root <kb_root> --area <area> --topic "<topic_name>" --relevance "<relevance>"
 ```
+
+### If mode is `update` (updating an existing topic):
+
+1. Read the existing topic file at `docs/<area>/<slug>.md`
+2. Present the current content to the user: "Here's what's currently in this topic:"
+3. Ask: "What would you like to change or add?"
+4. Skip to Step 3 (Research and draft) but scope the research to the specific changes requested
+5. In Step 4 (Present draft), show a diff of what changed rather than the full content
 
 ## Step 3: Research and draft
 

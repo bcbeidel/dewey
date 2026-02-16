@@ -43,6 +43,10 @@ dewey/
 2. **Tier 2 -- LLM-Assisted (Claude)** -- Pre-screener in `tier2_triggers.py` flags files with context data. Claude evaluates flagged items: source drift, depth accuracy, why-quality, in-practice concreteness, source primacy.
 3. **Tier 3 -- Human Judgment** -- Surfaces decisions requiring human input: relevance questions, scope decisions, pending proposals, conflict resolution.
 
+### Utilization Tracking
+
+A Claude Code `PostToolUse` hook on the `Read` tool automatically logs when an agent reads a KB topic file. Data feeds into `generate_recommendations()` which surfaces stale-high-use, expand-depth, low-utilization, and never-referenced files. Scaffold auto-generates the hook config. Claude Code-specific (other agents don't get auto-tracking).
+
 ### Design Principles
 
 Twelve principles grounded in agent context research and cognitive science guide knowledge base content. See @dewey/skills/health/references/design-principles.md for the full list.
@@ -83,5 +87,4 @@ All validators and triggers return `list[dict]` (always a list, even if empty):
 ## Known Limitations
 
 - Tier 3 human decision queue: designed in `health-review.md` but not yet tested
-- Utilization auto-capture: hook exists but auto-capture not yet wired up
 - Cross-provider support: KB output format is provider-agnostic by design, but Dewey currently only runs as a Claude Code plugin

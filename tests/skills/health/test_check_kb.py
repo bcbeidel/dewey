@@ -692,5 +692,64 @@ class TestNewValidatorsIntegration(unittest.TestCase):
         self.assertTrue(len(heading_issues) >= 2)
 
 
+class TestAutoFixIntegration(unittest.TestCase):
+    """Verify --fix and --dry-run work through run_health_check pipeline."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+        self.kb = self.tmpdir / "docs"
+        self.kb.mkdir()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def _make_incomplete_kb(self):
+        """Create a KB with a working file missing sections."""
+        area = self.kb / "area"
+        area.mkdir()
+        _write(area / "overview.md", _valid_md("overview"))
+        today = date.today().isoformat()
+        bare_working = (
+            f"---\nsources:\n  - https://example.com/doc\n"
+            f"last_validated: {today}\nrelevance: core\ndepth: working\n---\n\n"
+            f"# Topic\n\n## In Practice\nText.\n\n## Key Guidance\nText.\n"
+            + "\n".join([f"Line {i}" for i in range(15)]) + "\n"
+        )
+        _write(area / "topic.md", bare_working)
+        _write(area / "topic.ref.md", _valid_md("reference"))
+        return area / "topic.md"
+
+    def test_dry_run_does_not_modify(self):
+        """dry_run reports fixes but doesn't write to disk."""
+        topic = self._make_incomplete_kb()
+        original = topic.read_text()
+        result = run_health_check(self.tmpdir, dry_run=True)
+        self.assertIn("fixes", result)
+        self.assertTrue(len(result["fixes"]) > 0)
+        # Verify all actions are prefixed with "would_"
+        for fix in result["fixes"]:
+            self.assertTrue(fix["action"].startswith("would_"))
+        # File should be unchanged
+        self.assertEqual(topic.read_text(), original)
+
+    def test_fix_modifies_file(self):
+        """fix=True applies changes and reports them."""
+        topic = self._make_incomplete_kb()
+        original = topic.read_text()
+        result = run_health_check(self.tmpdir, fix=True)
+        self.assertIn("fixes", result)
+        self.assertTrue(len(result["fixes"]) > 0)
+        # File should be modified
+        self.assertNotEqual(topic.read_text(), original)
+        # Stubs should be present
+        self.assertIn("## Why This Matters", topic.read_text())
+
+    def test_no_fix_flag_no_fixes_key(self):
+        """Without fix/dry_run, result has no 'fixes' key."""
+        self._make_incomplete_kb()
+        result = run_health_check(self.tmpdir)
+        self.assertNotIn("fixes", result)
+
+
 if __name__ == "__main__":
     unittest.main()

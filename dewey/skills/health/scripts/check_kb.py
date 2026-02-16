@@ -29,6 +29,7 @@ from tier2_triggers import (
     trigger_source_primacy,
     trigger_why_quality,
 )
+from auto_fix import fix_missing_cross_links, fix_missing_sections
 from utilization import read_utilization
 from validators import (
     check_coverage,
@@ -68,7 +69,13 @@ def _discover_md_files(kb_root: Path, knowledge_dir_name: str = "docs") -> list[
     return md_files
 
 
-def run_health_check(kb_root: Path, *, _persist_history: bool = True) -> dict:
+def run_health_check(
+    kb_root: Path,
+    *,
+    _persist_history: bool = True,
+    fix: bool = False,
+    dry_run: bool = False,
+) -> dict:
     """Run all Tier 1 validators and return a structured report.
 
     Parameters
@@ -79,11 +86,16 @@ def run_health_check(kb_root: Path, *, _persist_history: bool = True) -> dict:
         When *True* (default), automatically persist a history snapshot.
         Set to *False* when called from ``run_combined_report`` to avoid
         duplicate entries.
+    fix:
+        When *True*, apply conservative auto-fixes for fixable issues.
+    dry_run:
+        When *True*, report what fixes *would* be applied without writing.
 
     Returns
     -------
     dict
         ``{"issues": [...], "summary": {...}}``
+        When *fix* or *dry_run* is set, also includes ``"fixes": [...]``.
     """
     knowledge_dir_name = read_knowledge_dir(kb_root)
     all_issues: list[dict] = []
@@ -136,6 +148,36 @@ def run_health_check(kb_root: Path, *, _persist_history: bool = True) -> dict:
             "pass_count": len(md_files) - len(files_with_fails),
         },
     }
+
+    # Auto-fix pass
+    if fix or dry_run:
+        fixes: list[dict] = []
+        for md_file in md_files:
+            file_issues = [i for i in all_issues if i.get("file") == str(md_file)]
+            if not file_issues:
+                continue
+            if dry_run:
+                # Report what would be done without writing
+                for issue in file_issues:
+                    msg = issue.get("message", "")
+                    if "Missing required section:" in msg:
+                        section = msg.split("Missing required section: ", 1)[1]
+                        fixes.append({
+                            "file": str(md_file),
+                            "action": "would_insert_stub_section",
+                            "section": section,
+                        })
+                    elif "See also" in msg or ("Go Deeper" in msg and "ref.md" in msg):
+                        fixes.append({
+                            "file": str(md_file),
+                            "action": "would_insert_cross_link",
+                            "detail": msg,
+                        })
+            else:
+                fixes.extend(fix_missing_sections(md_file, file_issues))
+                fixes.extend(fix_missing_cross_links(md_file, file_issues))
+        result["fixes"] = fixes
+
     if _persist_history:
         record_snapshot(kb_root, result["summary"], None, file_list=file_list)
     return result
@@ -513,6 +555,16 @@ if __name__ == "__main__":
         default=7,
         help="Minimum days of utilization data before generating recommendations (default: 7).",
     )
+    parser.add_argument(
+        "--fix",
+        action="store_true",
+        help="Apply conservative auto-fixes for fixable issues.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Report what fixes would be applied without writing.",
+    )
     args = parser.parse_args()
 
     kb_path = Path(args.kb_root)
@@ -538,5 +590,5 @@ if __name__ == "__main__":
             kb_path, min_reads=args.min_reads, min_days=args.min_days,
         )
     else:
-        report = run_health_check(kb_path)
+        report = run_health_check(kb_path, fix=args.fix, dry_run=args.dry_run)
     print(json.dumps(report, indent=2))

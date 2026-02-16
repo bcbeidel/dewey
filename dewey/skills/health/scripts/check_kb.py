@@ -28,6 +28,7 @@ from tier2_triggers import (
     trigger_source_primacy,
     trigger_why_quality,
 )
+from utilization import read_utilization
 from validators import (
     check_coverage,
     check_cross_references,
@@ -38,6 +39,7 @@ from validators import (
     check_section_ordering,
     check_size_bounds,
     check_source_urls,
+    parse_frontmatter,
 )
 
 
@@ -246,8 +248,6 @@ def generate_recommendations(
         or ``{"recommendations": [], "skipped": str}`` if gating fails.
     """
     from datetime import datetime
-    from utilization import read_utilization
-    from validators import check_freshness, parse_frontmatter
 
     knowledge_dir_name = read_knowledge_dir(kb_root)
     md_files = _discover_md_files(kb_root, knowledge_dir_name)
@@ -405,9 +405,10 @@ def generate_recommendations(
             classified.add(rel_path)
 
     # Priority 3: low_utilization
+    _LOW_UTIL_MIN_OVERVIEW_READS = 10
     for area_name, area_data in sorted(areas.items()):
         overview_reads = area_data["overview_reads"]
-        if overview_reads < 10:
+        if overview_reads < _LOW_UTIL_MIN_OVERVIEW_READS:
             continue
         threshold = overview_reads * 0.1
         for rel_path, info in sorted(area_data["files"].items()):

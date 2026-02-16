@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import subprocess
 import tempfile
 import unittest
 from datetime import date, datetime, timedelta
@@ -368,6 +369,84 @@ class TestSummary(unittest.TestCase):
         result = generate_recommendations(self.tmpdir, min_reads=0, min_days=0)
         total_from_categories = sum(result["summary"]["by_category"].values())
         self.assertEqual(total_from_categories, len(result["recommendations"]))
+
+
+class TestCLI(unittest.TestCase):
+    """Tests for --recommendations CLI flag."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+        self.kb = self.tmpdir / "docs"
+        area = self.kb / "area"
+        area.mkdir(parents=True)
+        _write(area / "overview.md", _valid_md("overview"))
+        _write(area / "topic.md", _valid_md("working"))
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def _run(self, *extra_args) -> subprocess.CompletedProcess:
+        script = Path(__file__).resolve().parent.parent.parent.parent / \
+            "dewey" / "skills" / "health" / "scripts" / "check_kb.py"
+        cmd = ["python3", str(script), "--kb-root", str(self.tmpdir)]
+        cmd.extend(extra_args)
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+
+    def test_recommendations_flag_returns_json(self):
+        """--recommendations produces valid JSON output."""
+        now = datetime.now().isoformat(timespec="seconds")
+        _write_utilization_log(self.tmpdir, [
+            _log_entry("docs/area/overview.md", now),
+        ])
+        result = self._run("--recommendations", "--min-reads", "0", "--min-days", "0")
+        self.assertEqual(result.returncode, 0)
+        parsed = json.loads(result.stdout)
+        self.assertIn("recommendations", parsed)
+
+    def test_recommendations_with_both(self):
+        """--both --recommendations includes all three sections."""
+        now = datetime.now().isoformat(timespec="seconds")
+        _write_utilization_log(self.tmpdir, [
+            _log_entry("docs/area/overview.md", now),
+        ])
+        result = self._run("--both", "--recommendations", "--min-reads", "0", "--min-days", "0")
+        self.assertEqual(result.returncode, 0)
+        parsed = json.loads(result.stdout)
+        self.assertIn("tier1", parsed)
+        self.assertIn("tier2", parsed)
+        self.assertIn("recommendations", parsed)
+
+    def test_recommendations_standalone(self):
+        """--recommendations alone (no --both, no --tier2) returns only recommendations."""
+        now = datetime.now().isoformat(timespec="seconds")
+        _write_utilization_log(self.tmpdir, [
+            _log_entry("docs/area/overview.md", now),
+        ])
+        result = self._run("--recommendations", "--min-reads", "0", "--min-days", "0")
+        self.assertEqual(result.returncode, 0)
+        parsed = json.loads(result.stdout)
+        self.assertIn("recommendations", parsed)
+        self.assertNotIn("tier1", parsed)
+
+    def test_min_reads_flag(self):
+        """--min-reads flag is respected."""
+        now = datetime.now().isoformat(timespec="seconds")
+        _write_utilization_log(self.tmpdir, [
+            _log_entry("docs/area/overview.md", now),
+        ])
+        result = self._run("--recommendations", "--min-reads", "999", "--min-days", "0")
+        parsed = json.loads(result.stdout)
+        self.assertIn("skipped", parsed)
+
+    def test_min_days_flag(self):
+        """--min-days flag is respected."""
+        now = datetime.now().isoformat(timespec="seconds")
+        _write_utilization_log(self.tmpdir, [
+            _log_entry("docs/area/overview.md", now),
+        ])
+        result = self._run("--recommendations", "--min-reads", "0", "--min-days", "999")
+        parsed = json.loads(result.stdout)
+        self.assertIn("skipped", parsed)
 
 
 if __name__ == "__main__":

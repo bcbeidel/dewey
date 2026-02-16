@@ -488,13 +488,40 @@ if __name__ == "__main__":
         action="store_true",
         help="Run both Tier 1 checks and Tier 2 pre-screening.",
     )
+    parser.add_argument(
+        "--recommendations",
+        action="store_true",
+        help="Generate utilization-driven curation recommendations.",
+    )
+    parser.add_argument(
+        "--min-reads",
+        type=int,
+        default=10,
+        help="Minimum total reads before generating recommendations (default: 10).",
+    )
+    parser.add_argument(
+        "--min-days",
+        type=int,
+        default=7,
+        help="Minimum days of utilization data before generating recommendations (default: 7).",
+    )
     args = parser.parse_args()
 
     kb_path = Path(args.kb_root)
-    if args.both:
+
+    if args.both and args.recommendations:
+        report = run_combined_report(kb_path)
+        report["recommendations"] = generate_recommendations(
+            kb_path, min_reads=args.min_reads, min_days=args.min_days,
+        )
+    elif args.both:
         report = run_combined_report(kb_path)
     elif args.tier2:
         report = run_tier2_prescreening(kb_path)
+    elif args.recommendations:
+        report = generate_recommendations(
+            kb_path, min_reads=args.min_reads, min_days=args.min_days,
+        )
     else:
         report = run_health_check(kb_path)
     print(json.dumps(report, indent=2))

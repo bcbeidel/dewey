@@ -1,0 +1,139 @@
+<objective>
+Help the user discover what knowledge domains to capture, scaffold the knowledge base, and build an initial curation plan.
+</objective>
+
+<required_reading>
+Load `${CLAUDE_PLUGIN_ROOT}/skills/init/references/kb-spec-summary.md` for context on the knowledge base specification.
+</required_reading>
+
+<process>
+## Phase 1: Understand the Problem Space
+
+Ask ONE question at a time. Start with:
+
+"What are the main problems or challenges you're trying to solve? What's frustrating or taking too long?"
+
+If `$ARGUMENTS` provided context (e.g., "I work in marketing"), tailor the opening:
+
+"You mentioned you work in [context]. What are the biggest problems or frustrations you run into in that work?"
+
+Listen for: recurring themes, specific tools/platforms mentioned, skill gaps, pain points.
+
+Follow up with WHY questions:
+- "Why is that a problem? What happens when it goes wrong?"
+- "Why does that take so long? What's the bottleneck?"
+- "What would change if you had an expert guiding you through that?"
+
+The WHY matters because it reveals the underlying knowledge gaps. Someone who says "I can't get my dashboards right" might need knowledge about data visualization, the specific BI tool, or the underlying data model -- the WHY tells you which.
+
+Continue until you have 3-5 distinct problem areas identified. Summarize what you've heard before moving on:
+
+"So far I'm hearing these pain points: [list]. Does that capture it, or is there something else?"
+
+## Phase 2: Map Recurring Tasks
+
+Ask: "What tasks do you do repeatedly where having an expert guide would help? Think about the things you do weekly or daily."
+
+Listen for:
+- Tasks with decision points (where judgment matters)
+- Tasks requiring domain expertise (where getting it wrong is costly)
+- Tasks where quality varies (good days vs. bad days)
+- Tasks where the user second-guesses themselves
+
+Follow up on the most promising ones:
+- "Walk me through how you do [task] today. Where do you get stuck or slow down?"
+- "What would a perfect version of that workflow look like?"
+
+## Phase 3: Identify Knowledge Domains
+
+Based on Phases 1 and 2, identify the knowledge domains that would address their problems and support their tasks. Group related problems and tasks into 3-5 coherent domains.
+
+Present your thinking:
+
+"Based on what you've described, I see these knowledge areas emerging:
+
+1. **[Domain Name]** -- [why it matters to their problems]
+2. **[Domain Name]** -- [why it matters]
+3. **[Domain Name]** -- [why it matters]
+
+Do these capture the right areas? Is anything missing?"
+
+Key principles for domain naming:
+- Use the practitioner's language, not academic categories
+- Each domain should map to a real area of their work
+- Domains should be distinct but collectively cover the full problem space
+- 3-5 is the sweet spot -- fewer is too thin, more is too scattered
+
+## Phase 4: Frame the Role
+
+Propose a role framing that captures who the KB serves:
+
+"It sounds like we're building a knowledge base for a **[Role Name]** -- someone who [brief description of what this role does and what success looks like].
+
+Does that feel right, or would you frame it differently?"
+
+The role name should be:
+- Specific enough to be meaningful ("Paid Media Analyst" over "Marketer")
+- Broad enough to capture the full scope ("Platform Engineer" over "Terraform User")
+- Natural to the user -- if they wouldn't use this title to describe themselves, adjust it
+
+## Phase 5: Scaffold the Knowledge Base
+
+Once the user confirms the role and domains:
+
+"Here's what we've got:
+
+**Role:** [Role Name]
+**Knowledge Domains:**
+1. **[Domain]** -- [what it covers]
+2. **[Domain]** -- [what it covers]
+3. **[Domain]** -- [what it covers]
+
+Let's set up the knowledge base with this structure."
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/init/scripts/scaffold.py --target <directory> --role "<persona>" --areas "<area1>,<area2>,<area3>"
+```
+
+Ask the user where to store knowledge base files (default: `docs`). If they specify a directory, add `--knowledge-dir "<dir>"`.
+
+## Phase 6: Build Curation Plan and Resume
+
+After scaffolding:
+
+1. For each domain area, propose 2-3 starter topics based on the user's stated goals from the discovery conversation
+2. Present them grouped by area and ask the user to confirm or adjust
+3. Write `.dewey/curation-plan.md` with the confirmed topics:
+
+    ```markdown
+    ---
+    last_updated: <today's date YYYY-MM-DD>
+    ---
+
+    # Curation Plan
+
+    ## <area-slug>
+    - [ ] Topic Name -- core -- brief rationale
+    ```
+
+4. If the user had a specific topic in mind when they started, resume by routing to the appropriate curate workflow with that topic. Otherwise, present the plan and ask what they'd like to work on first.
+</process>
+
+<key_principles>
+- ONE question at a time -- don't overwhelm
+- Always ask WHY -- surface the underlying knowledge gap, not just the symptom
+- The user is the expert -- we help them articulate, not prescribe
+- Summarize and confirm before moving to the next phase
+- 3-5 domain areas is the sweet spot -- fewer is too thin, more is too scattered
+- The role framing should feel natural to the user, not imposed
+- Use the practitioner's own language for domain names
+</key_principles>
+
+<success_criteria>
+- User feels heard and understood
+- 3-5 domain areas identified with clear rationale tied to real problems
+- Role framing agreed upon by the user
+- Knowledge base scaffolded (directories, AGENTS.md, CLAUDE.md, index.md, overviews)
+- Curation plan created with starter topics
+- User's original intent resumed if applicable
+</success_criteria>

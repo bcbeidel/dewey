@@ -104,7 +104,7 @@ If `.dewey/curation-plan.md` exists, check for an item matching the promoted top
 Regenerate the table of contents so the promoted topic appears:
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/init/scripts/scaffold.py --target <kb_root> --rebuild-index
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/curate/scripts/scaffold.py --target <kb_root> --rebuild-index
 ```
 
 ## Step 9: Report what was done

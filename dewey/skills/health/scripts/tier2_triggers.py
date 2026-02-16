@@ -17,7 +17,7 @@ import re
 from datetime import date
 from pathlib import Path
 
-from validators import parse_frontmatter
+from validators import parse_frontmatter, _body_without_frontmatter, _extract_section
 
 # ------------------------------------------------------------------
 # Depth-based expected ranges
@@ -36,50 +36,8 @@ DEPTH_PROSE_RANGES: dict[str, tuple[float, float]] = {
 }
 
 # ------------------------------------------------------------------
-# Shared helpers (module-internal)
+# Module-internal helpers
 # ------------------------------------------------------------------
-
-
-def _body_without_frontmatter(text: str) -> str:
-    """Strip content between first two ``---`` lines."""
-    lines = text.split("\n")
-    delimiter_count = 0
-    start = 0
-    for idx, line in enumerate(lines):
-        if line.strip() == "---":
-            delimiter_count += 1
-            if delimiter_count == 2:
-                start = idx + 1
-                break
-    if delimiter_count < 2:
-        return text
-    return "\n".join(lines[start:])
-
-
-def _extract_section(body: str, heading: str) -> str | None:
-    """Extract text between ``## <heading>`` and next ``## `` (or EOF).
-
-    Uses case-insensitive substring match on *heading*, matching the
-    convention in ``check_section_ordering`` (e.g. ``"In Practice" in h``).
-    """
-    lines = body.split("\n")
-    capturing = False
-    section_lines: list[str] = []
-
-    for line in lines:
-        if line.startswith("## "):
-            if capturing:
-                break
-            heading_text = line[3:].strip()
-            if heading.lower() in heading_text.lower():
-                capturing = True
-                continue
-        elif capturing:
-            section_lines.append(line)
-
-    if not section_lines and not capturing:
-        return None
-    return "\n".join(section_lines)
 
 
 def _count_words(text: str) -> int:

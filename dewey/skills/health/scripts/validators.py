@@ -25,6 +25,78 @@ _SIZE_BOUNDS: dict[str, tuple[int, int]] = {
     "reference": (3, 150),
 }
 
+_WORKING_SECTIONS = [
+    "Why This Matters",
+    "In Practice",
+    "Key Guidance",
+    "Watch Out For",
+    "Go Deeper",
+]
+
+_OVERVIEW_SECTIONS = [
+    "What This Covers",
+    "How It's Organized",
+]
+
+
+def _body_without_frontmatter(text: str) -> str:
+    """Strip content between first two ``---`` lines."""
+    lines = text.split("\n")
+    delimiter_count = 0
+    start = 0
+    for idx, line in enumerate(lines):
+        if line.strip() == "---":
+            delimiter_count += 1
+            if delimiter_count == 2:
+                start = idx + 1
+                break
+    if delimiter_count < 2:
+        return text
+    return "\n".join(lines[start:])
+
+
+def _extract_section(body: str, heading: str) -> str | None:
+    """Extract text between ``## <heading>`` and next ``## `` (or EOF).
+
+    Uses case-insensitive substring match on *heading*, matching the
+    convention in ``check_section_ordering`` (e.g. ``"In Practice" in h``).
+    """
+    lines = body.split("\n")
+    capturing = False
+    section_lines: list[str] = []
+
+    for line in lines:
+        if line.startswith("## "):
+            if capturing:
+                break
+            heading_text = line[3:].strip()
+            if heading.lower() in heading_text.lower():
+                capturing = True
+                continue
+        elif capturing:
+            section_lines.append(line)
+
+    if not section_lines and not capturing:
+        return None
+    return "\n".join(section_lines)
+
+
+def _strip_fenced_code_blocks(text: str) -> str:
+    """Replace fenced code block content with blank lines (preserves line count)."""
+    lines = text.split("\n")
+    result: list[str] = []
+    in_fence = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            result.append("")
+        elif in_fence:
+            result.append("")
+        else:
+            result.append(line)
+    return "\n".join(result)
+
 
 def parse_frontmatter(file_path: Path) -> dict:
     """Parse YAML-like frontmatter between ``---`` delimiters.
@@ -378,6 +450,169 @@ def check_inventory_regression(kb_root: Path, current_files: list[str]) -> list[
         issues.append({
             "file": missing,
             "message": f"File was present in last health check but is now missing: {missing}",
+            "severity": "warn",
+        })
+
+    return issues
+
+
+# ------------------------------------------------------------------
+# Content quality validators
+# ------------------------------------------------------------------
+
+
+def check_section_completeness(file_path: Path) -> list[dict]:
+    """Check that depth-appropriate sections are present."""
+    issues: list[dict] = []
+    name = str(file_path)
+    fm = parse_frontmatter(file_path)
+    depth = fm.get("depth")
+
+    if depth == "working":
+        expected = _WORKING_SECTIONS
+    elif depth == "overview":
+        expected = _OVERVIEW_SECTIONS
+    elif depth == "reference":
+        # Reference files just need a non-empty body
+        text = file_path.read_text()
+        body = _body_without_frontmatter(text).strip()
+        if not body:
+            issues.append({
+                "file": name,
+                "message": "Reference file has no content after frontmatter",
+                "severity": "warn",
+            })
+        return issues
+    else:
+        return issues
+
+    text = file_path.read_text()
+    headings = re.findall(r"^##\s+(.+)$", text, re.MULTILINE)
+    heading_lower = [h.lower() for h in headings]
+
+    for section in expected:
+        if not any(section.lower() in h for h in heading_lower):
+            issues.append({
+                "file": name,
+                "message": f"Missing required section: {section}",
+                "severity": "warn",
+            })
+
+    return issues
+
+
+def check_heading_hierarchy(file_path: Path) -> list[dict]:
+    """Check heading structure: exactly one H1, no skipped levels."""
+    issues: list[dict] = []
+    name = str(file_path)
+    text = file_path.read_text()
+    body = _body_without_frontmatter(text)
+    body = _strip_fenced_code_blocks(body)
+
+    # Extract heading levels from lines starting with #
+    levels: list[int] = []
+    for line in body.split("\n"):
+        match = re.match(r"^(#{1,6})\s+", line)
+        if match:
+            levels.append(len(match.group(1)))
+
+    h1_count = levels.count(1)
+    if h1_count == 0:
+        issues.append({
+            "file": name,
+            "message": "No H1 heading found",
+            "severity": "warn",
+        })
+    elif h1_count > 1:
+        issues.append({
+            "file": name,
+            "message": f"Multiple H1 headings found ({h1_count}); expected exactly 1",
+            "severity": "warn",
+        })
+
+    # Check for skipped levels (e.g. H1 -> H3 without H2)
+    for i in range(1, len(levels)):
+        if levels[i] > levels[i - 1] + 1:
+            issues.append({
+                "file": name,
+                "message": f"Skipped heading level: H{levels[i - 1]} to H{levels[i]}",
+                "severity": "warn",
+            })
+
+    return issues
+
+
+def check_go_deeper_links(file_path: Path) -> list[dict]:
+    """Check that Go Deeper section links to companion ref and external sources."""
+    issues: list[dict] = []
+    name = str(file_path)
+
+    # Only check working-depth files that are not reference files
+    if file_path.name.endswith(".ref.md"):
+        return issues
+
+    fm = parse_frontmatter(file_path)
+    if fm.get("depth") != "working":
+        return issues
+
+    text = file_path.read_text()
+    body = _body_without_frontmatter(text)
+    section = _extract_section(body, "Go Deeper")
+
+    # Skip silently if section missing (covered by check_section_completeness)
+    if section is None:
+        return issues
+
+    # Check for companion .ref.md link
+    stem = file_path.stem  # e.g. "bidding" from "bidding.md"
+    ref_name = f"{stem}.ref.md"
+    if ref_name not in section:
+        issues.append({
+            "file": name,
+            "message": f"Go Deeper section missing link to companion {ref_name}",
+            "severity": "warn",
+        })
+
+    # Check for external link
+    if not re.search(r"https?://", section):
+        issues.append({
+            "file": name,
+            "message": "Go Deeper section missing external link",
+            "severity": "warn",
+        })
+
+    return issues
+
+
+def check_ref_see_also(file_path: Path) -> list[dict]:
+    """Check that .ref.md files have a See Also linking to companion."""
+    issues: list[dict] = []
+    name = str(file_path)
+
+    if not file_path.name.endswith(".ref.md"):
+        return issues
+
+    text = file_path.read_text()
+    body = _body_without_frontmatter(text)
+
+    # Check for "see also" text (case-insensitive)
+    see_also_match = re.search(r"see\s+also", body, re.IGNORECASE)
+    if not see_also_match:
+        issues.append({
+            "file": name,
+            "message": "Reference file missing 'See also' section",
+            "severity": "warn",
+        })
+        return issues
+
+    # Check that see-also references the companion working file
+    # e.g. "bidding.ref.md" should link to "bidding.md"
+    stem = file_path.name[: -len(".ref.md")]  # "bidding" from "bidding.ref.md"
+    companion = f"{stem}.md"
+    if companion not in body:
+        issues.append({
+            "file": name,
+            "message": f"See also section missing link to companion {companion}",
             "severity": "warn",
         })
 

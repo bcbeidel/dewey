@@ -7,13 +7,7 @@ before writing to the target area.  Only stdlib is used.
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
-
-# config.py lives in init/scripts/ — add it to sys.path for cross-skill import.
-_init_scripts = str(Path(__file__).resolve().parent.parent.parent / "init" / "scripts")
-if _init_scripts not in sys.path:
-    sys.path.insert(0, _init_scripts)
 
 from config import read_knowledge_dir
 

@@ -119,7 +119,7 @@ If the area is already listed, no changes needed — do not add individual topic
 Regenerate the table of contents so the new topic appears:
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/init/scripts/scaffold.py --target <kb_root> --rebuild-index
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/curate/scripts/scaffold.py --target <kb_root> --rebuild-index
 ```
 
 ## Step 7: Update curation plan

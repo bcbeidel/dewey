@@ -12,10 +12,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# config.py lives in init/scripts/
-_init_scripts = str(Path(__file__).resolve().parent.parent.parent / "init" / "scripts")
-if _init_scripts not in sys.path:
-    sys.path.insert(0, _init_scripts)
+# config.py lives in curate/scripts/ — add it to sys.path for cross-skill import.
+_curate_scripts = str(Path(__file__).resolve().parent.parent.parent / "curate" / "scripts")
+if _curate_scripts not in sys.path:
+    sys.path.insert(0, _curate_scripts)
 
 from config import read_knowledge_dir
 from utilization import record_reference

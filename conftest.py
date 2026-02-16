@@ -1,7 +1,7 @@
 """Root conftest — add all plugin scripts directories to sys.path.
 
 Without __init__.py (which breaks plugin skill discovery), we cannot use
-package imports like ``from skills.init.scripts.templates import ...``.
+package imports like ``from skills.curate.scripts.templates import ...``.
 Instead, each scripts/ directory is added directly so tests can use
 ``from templates import ...``, ``from scaffold import ...``, etc.
 """

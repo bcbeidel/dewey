@@ -128,11 +128,11 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/curate/scripts/propose.py --kb-root <root> 
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/curate/scripts/promote.py --kb-root <root> --proposal "<slug>" --target-area "<area>"
 ```
 
-**Init scripts** (shared infrastructure) in `${CLAUDE_PLUGIN_ROOT}/skills/init/scripts/`:
+**Scaffolding scripts** in `scripts/`:
 
 **scaffold.py** -- Create or extend KB directory structure
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/init/scripts/scaffold.py --target <dir> --role "<persona>" --areas "<area1>,<area2>"
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/curate/scripts/scaffold.py --target <dir> --role "<persona>" --areas "<area1>,<area2>"
 ```
 
 **config.py** -- Read knowledge base configuration

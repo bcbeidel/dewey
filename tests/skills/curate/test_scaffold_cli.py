@@ -15,7 +15,7 @@ SCRIPT_PATH = (
     Path(__file__).resolve().parent.parent.parent.parent
     / "dewey"
     / "skills"
-    / "init"
+    / "curate"
     / "scripts"
     / "scaffold.py"
 )

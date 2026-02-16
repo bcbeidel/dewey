@@ -14,10 +14,10 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-# config.py lives in init/scripts/ — add it to sys.path for cross-skill import.
-_init_scripts = str(Path(__file__).resolve().parent.parent.parent / "init" / "scripts")
-if _init_scripts not in sys.path:
-    sys.path.insert(0, _init_scripts)
+# config.py lives in curate/scripts/ — add it to sys.path for cross-skill import.
+_curate_scripts = str(Path(__file__).resolve().parent.parent.parent / "curate" / "scripts")
+if _curate_scripts not in sys.path:
+    sys.path.insert(0, _curate_scripts)
 
 from config import read_knowledge_dir
 from history import record_snapshot
@@ -35,8 +35,12 @@ from validators import (
     check_cross_references,
     check_freshness,
     check_frontmatter,
+    check_go_deeper_links,
+    check_heading_hierarchy,
     check_index_sync,
     check_inventory_regression,
+    check_ref_see_also,
+    check_section_completeness,
     check_section_ordering,
     check_size_bounds,
     check_source_urls,
@@ -97,6 +101,10 @@ def run_health_check(kb_root: Path, *, _persist_history: bool = True) -> dict:
         all_issues.extend(check_size_bounds(md_file))
         all_issues.extend(check_source_urls(md_file))
         all_issues.extend(check_freshness(md_file))
+        all_issues.extend(check_section_completeness(md_file))
+        all_issues.extend(check_heading_hierarchy(md_file))
+        all_issues.extend(check_go_deeper_links(md_file))
+        all_issues.extend(check_ref_see_also(md_file))
 
     # Structural validators (run once)
     all_issues.extend(check_coverage(kb_root, knowledge_dir_name=knowledge_dir_name))

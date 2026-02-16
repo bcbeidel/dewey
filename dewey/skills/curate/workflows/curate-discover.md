@@ -3,7 +3,7 @@ Help the user discover what knowledge domains to capture, scaffold the knowledge
 </objective>
 
 <required_reading>
-Load `${CLAUDE_PLUGIN_ROOT}/skills/init/references/kb-spec-summary.md` for context on the knowledge base specification.
+Load `${CLAUDE_PLUGIN_ROOT}/skills/curate/references/kb-spec-summary.md` for context on the knowledge base specification.
 </required_reading>
 
 <process>
@@ -92,7 +92,7 @@ Once the user confirms the role and domains:
 Let's set up the knowledge base with this structure."
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/init/scripts/scaffold.py --target <directory> --role "<persona>" --areas "<area1>,<area2>,<area3>"
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/curate/scripts/scaffold.py --target <directory> --role "<persona>" --areas "<area1>,<area2>,<area3>"
 ```
 
 Ask the user where to store knowledge base files (default: `docs`). If they specify a directory, add `--knowledge-dir "<dir>"`.

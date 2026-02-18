@@ -1,5 +1,7 @@
 # Dewey -- Knowledge Base Management for Claude Code
 
+> **Archived:** This was a learning project. Active development has moved to [bcbeidel/wos](https://github.com/bcbeidel/wos).
+
 Dewey is a Claude Code plugin that helps you build, curate, and maintain structured knowledge bases. It implements a specification for role-specific knowledge bases that serve both AI agents and humans.
 
 ## Why
